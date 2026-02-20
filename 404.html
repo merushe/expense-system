@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Akses Ditolak</title>
+    <style>
+        body { font-family: Arial; text-align: center; padding: 50px; }
+        .error { color: #dc3545; font-size: 48px; }
+        .message { color: #666; margin: 20px; }
+    </style>
+</head>
+<body>
+    <div class="error">403</div>
+    <h1>Akses Ditolak</h1>
+    <div class="message">Anda tidak memiliki izin untuk mengakses halaman ini.</div>
+    <a href="/index.html">Kembali ke Beranda</a>
+    
+    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    <script>
+        netlifyIdentity.init();
+    </script>
+</body>
+</html>

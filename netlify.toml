@@ -1,7 +1,50 @@
-[build]
-  publish = "."
+# netlify.toml - Konfigurasi akses berdasarkan role
+
+# Aturan akses untuk setiap halaman
+[[redirects]]
+  from = "/dashboard.html"
+  to = "/dashboard.html"
+  status = 200
+  force = true
+  conditions = {Role = ["admin", "finance"]}
 
 [[redirects]]
-  from = "/*"
+  from = "/approval.html"
+  to = "/approval.html"
+  status = 200
+  force = true
+  conditions = {Role = ["admin", "approver"]}
+
+[[redirects]]
+  from = "/payment.html"
+  to = "/payment.html"
+  status = 200
+  force = true
+  conditions = {Role = ["admin", "finance"]}
+
+[[redirects]]
+  from = "/form.html"
+  to = "/form.html"
+  status = 200
+  force = true
+  conditions = {Role = ["admin", "employee"]}
+
+# Halaman utama dan API bebas akses
+[[redirects]]
+  from = "/index.html"
   to = "/index.html"
   status = 200
+  force = true
+
+[[redirects]]
+  from = "/api.js"
+  to = "/api.js"
+  status = 200
+  force = true
+
+# Jika tidak punya role yang sesuai, tampilkan halaman 404
+[[redirects]]
+  from = "/*"
+  to = "/404.html"
+  status = 404
+  force = true
