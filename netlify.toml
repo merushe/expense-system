@@ -1,4 +1,4 @@
-# netlify.toml - VERSION TANPA PROTEKSI (untuk testing)
+# PUBLIC FILES (WAJIB PALING ATAS)
 [[redirects]]
   from = "/"
   to = "/index.html"
@@ -6,7 +6,19 @@
   force = true
 
 [[redirects]]
-  from = "/*"
+  from = "/index.html"
   to = "/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api.js"
+  to = "/api.js"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*.js"
+  to = "/:splat"
   status = 200
   force = true

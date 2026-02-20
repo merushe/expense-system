@@ -2,64 +2,75 @@
 <html>
 <head>
     <title>Expense System - Login</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
+        button:hover { background: #0056b3; }
+    </style>
 </head>
 <body>
     <h1>Expense System</h1>
     <p>Silakan login untuk mengakses aplikasi.</p>
     
-    <!-- Tombol Login/Logout -->
-    <div style="position: fixed; top: 10px; right: 10px;">
-      <button id="login-btn">Login</button>
-      <button id="logout-btn" style="display: none;">Logout</button>
-    </div>
-    
-    <div id="dashboard-link" style="display: none; margin-top: 20px;">
-      <a href="Dashboard.html">Lanjut ke Dashboard →</a>
-    </div>
+    <!-- Tombol Login -->
+    <button id="login-btn">Login</button>
+    <button id="logout-btn" style="display:none;">Logout</button>
 
-    <!-- Widget Identity Netlify -->
+    <!-- Netlify Identity Widget -->
     <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
     <script>
+      // Inisialisasi widget
       netlifyIdentity.init();
       
-      function updateUI() {
+      // Fungsi untuk update tombol
+      function updateButtons() {
         const user = netlifyIdentity.currentUser();
         const loginBtn = document.getElementById('login-btn');
         const logoutBtn = document.getElementById('logout-btn');
-        const dashboardLink = document.getElementById('dashboard-link');
         
         if (user) {
           loginBtn.style.display = 'none';
-          logoutBtn.style.display = 'block';
-          dashboardLink.style.display = 'block';
-          console.log('Logged in as:', user.email);
+          logoutBtn.style.display = 'inline-block';
+          alert(`Selamat datang! Role Anda: ${user.app_metadata?.roles?.join(', ') || 'tidak ada'}`);
+          window.location.href = '/Dashboard.html';
         } else {
-          loginBtn.style.display = 'block';
+          loginBtn.style.display = 'inline-block';
           logoutBtn.style.display = 'none';
-          dashboardLink.style.display = 'none';
         }
       }
 
+      // Event saat halaman dimuat
       document.addEventListener('DOMContentLoaded', function() {
-        document.getElementById('login-btn').addEventListener('click', () => {
+        // Tombol login
+        document.getElementById('login-btn').addEventListener('click', function(e) {
+          e.preventDefault();
           netlifyIdentity.open();
         });
 
-        document.getElementById('logout-btn').addEventListener('click', () => {
+        // Tombol logout
+        document.getElementById('logout-btn').addEventListener('click', function(e) {
+          e.preventDefault();
           netlifyIdentity.logout();
         });
 
-        updateUI();
+        // Cek status login
+        updateButtons();
       });
 
-      netlifyIdentity.on('login', (user) => {
-        console.log('Login success');
-        updateUI();
+      // Event listener
+      netlifyIdentity.on('login', function(user) {
+        console.log('Login success:', user.email);
+        updateButtons();
       });
 
-      netlifyIdentity.on('logout', () => {
+      netlifyIdentity.on('logout', function() {
         console.log('Logout success');
-        updateUI();
+        updateButtons();
+      });
+
+      netlifyIdentity.on('error', function(err) {
+        console.error('Identity error:', err);
+        alert('Error: ' + err.message);
       });
     </script>
 </body>
