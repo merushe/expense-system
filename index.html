@@ -1,75 +1,66 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta http-equiv="refresh" content="0; url=Dashboard.html">
+    <title>Expense System - Login</title>
 </head>
 <body>
-    <p>Redirecting to Expense System...</p>
-
-<!-- Tombol Login/Logout -->
-<div style="position: fixed; top: 10px; right: 10px; z-index: 1000;">
-  <button id="login-btn" style="padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Login</button>
-  <button id="logout-btn" style="padding: 8px 16px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: none;">Logout</button>
-</div>
-
-<!-- Widget Identity Netlify (CUKUP SATU KALI) -->
-<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script>
-  // Inisialisasi widget
-  netlifyIdentity.init();
-  
-  // Fungsi untuk update tampilan tombol
-  function updateButtons() {
-    const user = netlifyIdentity.currentUser();
-    const loginBtn = document.getElementById('login-btn');
-    const logoutBtn = document.getElementById('logout-btn');
+    <h1>Expense System</h1>
+    <p>Silakan login untuk mengakses aplikasi.</p>
     
-    if (user) {
-      loginBtn.style.display = 'none';
-      logoutBtn.style.display = 'block';
-      console.log('Logged in as:', user.email);
-    } else {
-      loginBtn.style.display = 'block';
-      logoutBtn.style.display = 'none';
-      console.log('Not logged in');
-    }
-  }
+    <!-- Tombol Login/Logout -->
+    <div style="position: fixed; top: 10px; right: 10px;">
+      <button id="login-btn">Login</button>
+      <button id="logout-btn" style="display: none;">Logout</button>
+    </div>
+    
+    <div id="dashboard-link" style="display: none; margin-top: 20px;">
+      <a href="Dashboard.html">Lanjut ke Dashboard →</a>
+    </div>
 
-  // Event saat halaman siap
-  document.addEventListener('DOMContentLoaded', function() {
-    // Tombol login
-    document.getElementById('login-btn').addEventListener('click', function(e) {
-      e.preventDefault();
-      netlifyIdentity.open();
-    });
+    <!-- Widget Identity Netlify -->
+    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    <script>
+      netlifyIdentity.init();
+      
+      function updateUI() {
+        const user = netlifyIdentity.currentUser();
+        const loginBtn = document.getElementById('login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const dashboardLink = document.getElementById('dashboard-link');
+        
+        if (user) {
+          loginBtn.style.display = 'none';
+          logoutBtn.style.display = 'block';
+          dashboardLink.style.display = 'block';
+          console.log('Logged in as:', user.email);
+        } else {
+          loginBtn.style.display = 'block';
+          logoutBtn.style.display = 'none';
+          dashboardLink.style.display = 'none';
+        }
+      }
 
-    // Tombol logout
-    document.getElementById('logout-btn').addEventListener('click', function(e) {
-      e.preventDefault();
-      netlifyIdentity.logout();
-    });
+      document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('login-btn').addEventListener('click', () => {
+          netlifyIdentity.open();
+        });
 
-    // Cek status awal
-    updateButtons();
-  });
+        document.getElementById('logout-btn').addEventListener('click', () => {
+          netlifyIdentity.logout();
+        });
 
-  // Event listener
-  netlifyIdentity.on('login', function(user) {
-    console.log('Login berhasil!', user.email);
-    updateButtons();
-    window.location.reload(); // Reload untuk terapkan akses
-  });
+        updateUI();
+      });
 
-  netlifyIdentity.on('logout', function() {
-    console.log('Logout berhasil');
-    updateButtons();
-    window.location.reload();
-  });
+      netlifyIdentity.on('login', (user) => {
+        console.log('Login success');
+        updateUI();
+      });
 
-  netlifyIdentity.on('error', function(err) {
-    console.error('Identity error:', err);
-  });
-</script>
-
+      netlifyIdentity.on('logout', () => {
+        console.log('Logout success');
+        updateUI();
+      });
+    </script>
 </body>
 </html>
