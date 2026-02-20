@@ -5,61 +5,71 @@
 </head>
 <body>
     <p>Redirecting to Expense System...</p>
+
 <!-- Tombol Login/Logout -->
 <div style="position: fixed; top: 10px; right: 10px; z-index: 1000;">
   <button id="login-btn" style="padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Login</button>
   <button id="logout-btn" style="padding: 8px 16px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: none;">Logout</button>
 </div>
 
-<!-- Widget Identity Netlify -->
+<!-- Widget Identity Netlify (CUKUP SATU KALI) -->
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 <script>
   // Inisialisasi widget
-  netlifyIdentity.init({
-    container: '#netlify-identity-modal', // defaults to document.body
-    locale: 'id' // Bahasa Indonesia
-  });
-
-  // Tombol login
-  document.getElementById('login-btn').addEventListener('click', () => {
-    netlifyIdentity.open();
-  });
-
-  // Tombol logout
-  document.getElementById('logout-btn').addEventListener('click', () => {
-    netlifyIdentity.logout();
-  });
-
-  // Event saat login berhasil
-  netlifyIdentity.on('login', user => {
-    console.log('Login berhasil!', user);
-    document.getElementById('login-btn').style.display = 'none';
-    document.getElementById('logout-btn').style.display = 'block';
+  netlifyIdentity.init();
+  
+  // Fungsi untuk update tampilan tombol
+  function updateButtons() {
+    const user = netlifyIdentity.currentUser();
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
     
-    // Tampilkan role user (untuk debugging)
-    if (user.app_metadata && user.app_metadata.roles) {
-      alert(`Selamat datang! Role Anda: ${user.app_metadata.roles.join(', ')}`);
+    if (user) {
+      loginBtn.style.display = 'none';
+      logoutBtn.style.display = 'block';
+      console.log('Logged in as:', user.email);
     } else {
-      alert('Selamat datang! Anda login tanpa role khusus.');
+      loginBtn.style.display = 'block';
+      logoutBtn.style.display = 'none';
+      console.log('Not logged in');
     }
-    
+  }
+
+  // Event saat halaman siap
+  document.addEventListener('DOMContentLoaded', function() {
+    // Tombol login
+    document.getElementById('login-btn').addEventListener('click', function(e) {
+      e.preventDefault();
+      netlifyIdentity.open();
+    });
+
+    // Tombol logout
+    document.getElementById('logout-btn').addEventListener('click', function(e) {
+      e.preventDefault();
+      netlifyIdentity.logout();
+    });
+
+    // Cek status awal
+    updateButtons();
+  });
+
+  // Event listener
+  netlifyIdentity.on('login', function(user) {
+    console.log('Login berhasil!', user.email);
+    updateButtons();
     window.location.reload(); // Reload untuk terapkan akses
   });
 
-  // Event saat logout
-  netlifyIdentity.on('logout', () => {
+  netlifyIdentity.on('logout', function() {
     console.log('Logout berhasil');
-    document.getElementById('login-btn').style.display = 'block';
-    document.getElementById('logout-btn').style.display = 'none';
+    updateButtons();
     window.location.reload();
   });
 
-  // Cek status login saat halaman dimuat
-  const currentUser = netlifyIdentity.currentUser();
-  if (currentUser) {
-    document.getElementById('login-btn').style.display = 'none';
-    document.getElementById('logout-btn').style.display = 'block';
-  }
+  netlifyIdentity.on('error', function(err) {
+    console.error('Identity error:', err);
+  });
 </script>
+
 </body>
 </html>
