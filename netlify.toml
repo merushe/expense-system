@@ -1,6 +1,37 @@
 # netlify.toml - Konfigurasi akses berdasarkan role
 
-# Aturan akses untuk setiap halaman
+# ATURAN PUBLIC (WAJIB PALING ATAS)
+[[redirects]]
+  from = "/"
+  to = "/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/index.html"
+  to = "/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api.js"
+  to = "/api.js"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/404.html"
+  to = "/404.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/403.html"
+  to = "/403.html"
+  status = 200
+  force = true
+
+# ATURAN PROTECTED (hanya dengan role tertentu)
 [[redirects]]
   from = "/dashboard.html"
   to = "/dashboard.html"
@@ -29,22 +60,9 @@
   force = true
   conditions = {Role = ["admin", "employee"]}
 
-# Halaman utama dan API bebas akses
-[[redirects]]
-  from = "/index.html"
-  to = "/index.html"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api.js"
-  to = "/api.js"
-  status = 200
-  force = true
-
-# Jika tidak punya role yang sesuai, tampilkan halaman 404
+# SEMUA HALAMAN LAIN (termasuk yang salah ketik) akan kena 403
 [[redirects]]
   from = "/*"
-  to = "/404.html"
-  status = 404
+  to = "/403.html"
+  status = 403
   force = true
