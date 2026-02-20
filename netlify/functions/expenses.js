@@ -1,3 +1,8 @@
+// Di bagian paling atas expenses.js, tambahkan:
+console.log('=== FUNCTIONS STARTED ===');
+console.log('Token exists:', !!process.env.AIRTABLE_TOKEN);
+console.log('Base ID exists:', !!process.env.AIRTABLE_BASE_ID);
+
 // netlify/functions/expenses.js
 const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
