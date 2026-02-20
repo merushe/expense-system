@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment - Expense System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    
+    <!-- AIRTABLE API -->
+    <script src="api.js"></script>
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #2c3e50 0%, #1a2530 100%);
+            margin-bottom: 30px;
+        }
+        .page-header {
+            background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+            color: white;
+            padding: 25px 0;
+            margin-bottom: 30px;
+            border-radius: 0 0 15px 15px;
+        }
+        .payment-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-left: 4px solid #9b59b6;
+        }
+        .payment-card.paid { border-left-color: #2ecc71; }
+        .payment-card.approved { border-left-color: #3498db; }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-awaiting { background: #fff3cd; color: #856404; }
+        .badge-approved { background: #d4edda; color: #155724; }
+        .badge-paid { background: #2ecc71; color: white; }
+        .badge-pending-main { background: #e67e22; color: white; }
+        .badge-sub-approved { background: #3498db; color: white; }
+        .badge-rejected { background: #e74c3c; color: white; }
+        .btn-process { background: #9b59b6; color: white; }
+        .sync-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .step {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-right: 5px;
+            background: #eee;
+            font-size: 12px;
+        }
+        .step.active {
+            background: #f39c12;
+            color: white;
+        }
+        .step.completed {
+            background: #2ecc71;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sync Indicator -->
+    <div class="sync-indicator">
+        <div class="alert alert-sm mb-0 shadow" id="syncIndicator">
+            <i class="bi bi-hourglass-split"></i> <span id="syncText">Syncing...</span>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="Dashboard.html">
+                <i class="bi bi-wallet2"></i> Expense System
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="Dashboard.html"><i class="bi bi-house-door"></i> Dashboard</a>
+                <a class="nav-link" href="Form.html"><i class="bi bi-plus-circle"></i> Submit</a>
+                <a class="nav-link" href="Approval.html"><i class="bi bi-check-circle"></i> Approve</a>
+                <a class="nav-link active" href="Payment.html"><i class="bi bi-credit-card"></i> Pay</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-2"><i class="bi bi-credit-card"></i> Payment Processing</h1>
+                    <p class="mb-0">Process payments for approved expenses</p>
+                </div>
+                <div class="text-end">
+                    <small id="paymentStatus">Loading payment data...</small>
+                    <div class="small" id="dataSourceLabel">From Airtable</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title" id="awaitingCount">0</h5>
+                        <p class="card-text text-muted">Awaiting Payment</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title" id="processedCount">0</h5>
+                        <p class="card-text text-muted">Processed Today</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title" id="totalApproved">0</h5>
+                        <p class="card-text text-muted">Total Approved</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title" id="totalAmount">Rp 0</h5>
+                        <p class="card-text text-muted">Total This Month</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Batch Processing -->
+        <div class="alert alert-info mb-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6><i class="bi bi-lightning"></i> Batch Processing</h6>
+                    <p class="mb-0">Process multiple payments at once</p>
+                </div>
+                <div>
+                    <button class="btn btn-primary" onclick="processAllApproved()">
+                        <i class="bi bi-check-all"></i> Process All Approved
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <a class="nav-link active" href="#" onclick="showTab('awaiting')">Awaiting Payment</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showTab('paid')">Paid</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showTab('in-progress')">In Progress</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showTab('all')">All</a>
+            </li>
+        </ul>
+
+        <!-- Payment List -->
+        <div id="awaitingTab" class="tab-content">
+            <h4 class="mb-3">Expenses Awaiting Payment</h4>
+            <p class="text-muted mb-3">Expenses with status "approved" and not yet paid</p>
+            <div id="awaitingList"></div>
+            <div id="noAwaiting" class="text-center py-5" style="display: none;">
+                <i class="bi bi-check-circle display-4 text-muted mb-3"></i>
+                <h5>No payments pending</h5>
+                <p class="text-muted">All approved expenses have been processed</p>
+            </div>
+        </div>
+
+        <div id="paidTab" class="tab-content" style="display: none;">
+            <h4 class="mb-3">Paid Expenses</h4>
+            <p class="text-muted mb-3">All expenses that have been paid</p>
+            <div id="paidList"></div>
+        </div>
+
+        <div id="inProgressTab" class="tab-content" style="display: none;">
+            <h4 class="mb-3">Expenses In Progress</h4>
+            <p class="text-muted mb-3">Expenses still in approval process</p>
+            <div id="inProgressList"></div>
+        </div>
+
+        <div id="allTab" class="tab-content" style="display: none;">
+            <h4 class="mb-3">All Payment History</h4>
+            <p class="text-muted mb-3">Complete expense history</p>
+            <div id="allList"></div>
+        </div>
+
+        <!-- Debug -->
+        <div class="mt-4">
+            <button class="btn btn-sm btn-outline-secondary" onclick="refreshData()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh Data
+            </button>
+            <button class="btn btn-sm btn-outline-info" onclick="checkData()">
+                <i class="bi bi-database"></i> Check Data
+            </button>
+            <button class="btn btn-sm btn-outline-warning" onclick="testConnection()">
+                <i class="bi bi-wifi"></i> Test Connection
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+<script src="sync-manager.js"></script>
+<script>
+// OVERRIDE FUNGSI UNTUK PAYMENT.HTML
+
+// Simpan fungsi asli
+const originalLoadExpenses = window.loadExpenses;
+const originalUpdatePaymentStatus = window.updatePaymentStatus;
+
+// Override loadExpenses
+window.loadExpenses = async function() {
+    try {
+        console.log('Loading consolidated payment data...');
+        
+        if (window.airtableService && window.airtableService.getConsolidatedData) {
+            allExpenses = await window.airtableService.getConsolidatedData();
+            console.log(`Loaded ${allExpenses.length} consolidated expenses`);
+            
+            // Hitung statistics
+            const awaiting = allExpenses.filter(item => 
+                item.status === 'approved' && 
+                (!item.paymentStatus || item.paymentStatus !== 'paid')
+            ).length;
+            
+            const today = new Date().toISOString().split('T')[0];
+            const processedToday = allExpenses.filter(item => 
+                item.paymentStatus === 'paid' && 
+                item.paymentDate === today
+            ).length;
+            
+            const totalApproved = allExpenses.filter(item => 
+                item.status === 'approved'
+            ).length;
+            
+            // Calculate this month's total
+            const now = new Date();
+            const thisMonth = now.getMonth() + 1;
+            const thisYear = now.getFullYear();
+            
+            const totalAmount = allExpenses
+                .filter(item => {
+                    if (!item.paymentDate) return false;
+                    const paymentDate = new Date(item.paymentDate);
+                    return paymentDate.getMonth() + 1 === thisMonth && 
+                           paymentDate.getFullYear() === thisYear;
+                })
+                .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+            
+            // Update UI
+            document.getElementById('awaitingCount').textContent = awaiting;
+            document.getElementById('processedCount').textContent = processedToday;
+            document.getElementById('totalApproved').textContent = totalApproved;
+            document.getElementById('totalAmount').textContent = 'Rp ' + formatCurrency(totalAmount);
+            
+            // Render tab
+            if (typeof renderTab === 'function') {
+                renderTab(currentTab);
+            }
+            
+            // Update connection status
+            if (window.SyncManager) {
+                const status = window.SyncManager.getConnectionStatus();
+                const syncIndicator = document.getElementById('syncIndicator');
+                const syncText = document.getElementById('syncText');
+                const dataSourceLabel = document.getElementById('dataSourceLabel');
+                const paymentStatus = document.getElementById('paymentStatus');
+                
+                if (syncIndicator) {
+                    syncIndicator.className = status.isOnline ? 
+                        'alert alert-sm alert-success mb-0 shadow' : 
+                        'alert alert-sm alert-danger mb-0 shadow';
+                }
+                if (syncText) {
+                    syncText.textContent = status.isOnline ? 
+                        `Online (${allExpenses.length} records)` : 'Offline - Using Local';
+                }
+                if (dataSourceLabel) {
+                    dataSourceLabel.textContent = status.isOnline ? 'From Airtable' : 'From Local Storage';
+                }
+                if (paymentStatus) {
+                    paymentStatus.textContent = status.isOnline ? 'Connected to cloud' : 'Working offline';
+                }
+            }
+            
+        } else {
+            if (originalLoadExpenses) await originalLoadExpenses();
+        }
+    } catch (error) {
+        console.error('Error loading consolidated data:', error);
+        if (originalLoadExpenses) await originalLoadExpenses();
+    }
+};
+
+// Override updatePaymentStatus
+window.updatePaymentStatus = async function(expenseId, paymentDate, paymentMethod, paidBy) {
+    try {
+        const expense = allExpenses.find(item => item.id === expenseId);
+        if (!expense) {
+            alert('Expense not found!');
+            return;
+        }
+        
+        const updateData = {
+            paymentStatus: 'paid',
+            paymentDate: paymentDate,
+            paymentMethod: paymentMethod,
+            paidBy: paidBy,
+            status: 'paid',
+            lastUpdated: new Date().toISOString()
+        };
+        
+        window._updatingPayment = true;
+        
+        let result = { success: false };
+        
+        if (window.airtableService && window.SyncManager && window.SyncManager.isOnline) {
+            result = await window.airtableService.updateExpense(expense.airtableId || expenseId, updateData);
+        }
+        
+        // Update localStorage
+        try {
+            const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
+            const index = localData.findIndex(item => 
+                item.airtableId === expense.airtableId || item.id === expenseId
+            );
+            if (index >= 0) {
+                localData[index] = { ...localData[index], ...updateData };
+                localStorage.setItem('expenseSubmissions', JSON.stringify(localData));
+            }
+        } catch (e) {}
+        
+        window._updatingPayment = false;
+        
+        if (result.success || !window.SyncManager?.isOnline) {
+            alert('✅ Payment recorded successfully!');
+            loadExpenses();
+        } else {
+            alert(`⚠️ Payment recorded locally. Will sync when online.`);
+            loadExpenses();
+        }
+        
+    } catch (error) {
+        console.error('Error updating payment:', error);
+        window._updatingPayment = false;
+        alert('Error recording payment.');
+    }
+};
+
+// Fungsi manual sync
+function manualSync() {
+    if (window.SyncManager) {
+        window.SyncManager.manualSync();
+    } else {
+        alert('Sync Manager not available');
+    }
+}
+</script>
+    
+    <script>
+        let allExpenses = [];
+        let currentTab = 'awaiting';
+        let isOnline = false;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Payment page loaded - Airtable Version');
+            
+            // Update navigation active state
+            const currentPage = window.location.pathname.split('/').pop();
+            document.querySelectorAll('.nav-link').forEach(link => {
+                if (link.getAttribute('href') === currentPage) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+            
+            // Test connection first
+            testConnection();
+            
+            // Load expenses
+            loadExpenses();
+            
+            // Auto-refresh every 10 seconds
+            setInterval(loadExpenses, 10000);
+        });
+
+        async function testConnection() {
+            try {
+                document.getElementById('syncIndicator').className = 'alert alert-sm alert-warning mb-0 shadow';
+                document.getElementById('syncText').textContent = 'Testing connection...';
+                
+                const testData = await window.airtableService.getAllExpenses();
+                isOnline = true;
+                
+                document.getElementById('syncIndicator').className = 'alert alert-sm alert-success mb-0 shadow';
+                document.getElementById('syncText').textContent = `Online (${testData.length} records)`;
+                document.getElementById('dataSourceLabel').textContent = 'From Airtable';
+                document.getElementById('paymentStatus').textContent = 'Connected to cloud';
+                
+                return true;
+            } catch (error) {
+                isOnline = false;
+                
+                document.getElementById('syncIndicator').className = 'alert alert-sm alert-danger mb-0 shadow';
+                document.getElementById('syncText').textContent = 'Offline - Using Local';
+                document.getElementById('dataSourceLabel').textContent = 'From Local Storage';
+                document.getElementById('paymentStatus').textContent = 'Working offline';
+                
+                return false;
+            }
+        }
+
+        async function loadExpenses() {
+            try {
+                console.log('Loading payment data from Airtable...');
+                
+                allExpenses = await window.airtableService.getAllExpenses();
+                console.log(`Loaded ${allExpenses.length} expenses for payment processing`);
+                
+                // Calculate statistics
+                const awaiting = allExpenses.filter(item => 
+                    item.status === 'approved' && 
+                    (!item.paymentStatus || item.paymentStatus !== 'paid')
+                ).length;
+                
+                const today = new Date().toISOString().split('T')[0];
+                const processedToday = allExpenses.filter(item => 
+                    item.paymentStatus === 'paid' && 
+                    item.paymentDate === today
+                ).length;
+                
+                const totalApproved = allExpenses.filter(item => 
+                    item.status === 'approved'
+                ).length;
+                
+                // Calculate this month's total
+                const now = new Date();
+                const thisMonth = now.getMonth() + 1;
+                const thisYear = now.getFullYear();
+                
+                const totalAmount = allExpenses
+                    .filter(item => {
+                        if (!item.paymentDate) return false;
+                        const paymentDate = new Date(item.paymentDate);
+                        return paymentDate.getMonth() + 1 === thisMonth && 
+                               paymentDate.getFullYear() === thisYear;
+                    })
+                    .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+                
+                // Update statistics
+                document.getElementById('awaitingCount').textContent = awaiting;
+                document.getElementById('processedCount').textContent = processedToday;
+                document.getElementById('totalApproved').textContent = totalApproved;
+                document.getElementById('totalAmount').textContent = 'Rp ' + formatCurrency(totalAmount);
+                
+                // Render current tab
+                renderTab(currentTab);
+                
+            } catch (error) {
+                console.error('Error loading payment data:', error);
+                alert('Error loading payment data. Using local storage.');
+            }
+        }
+
+        function showTab(tabName) {
+            currentTab = tabName;
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').style.display = 'block';
+            
+            // Update nav links active state
+            document.querySelectorAll('.nav-tabs .nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            renderTab(tabName);
+        }
+
+        function renderTab(tabName) {
+            let filteredExpenses = [];
+            let title = '';
+            let description = '';
+            
+            switch(tabName) {
+                case 'awaiting':
+                    filteredExpenses = allExpenses.filter(item => 
+                        item.status === 'approved' && 
+                        (!item.paymentStatus || item.paymentStatus !== 'paid')
+                    );
+                    title = 'Expenses Awaiting Payment';
+                    description = 'Expenses with status "approved" and not yet paid';
+                    break;
+                    
+                case 'paid':
+                    filteredExpenses = allExpenses.filter(item => 
+                        item.paymentStatus === 'paid'
+                    );
+                    title = 'Paid Expenses';
+                    description = 'All expenses that have been paid';
+                    break;
+                    
+                case 'in-progress':
+                    filteredExpenses = allExpenses.filter(item => 
+                        item.status === 'pending' || 
+                        item.status === 'pending-main' || 
+                        item.status === 'sub-approved'
+                    );
+                    title = 'Expenses In Progress';
+                    description = 'Expenses still in approval process';
+                    break;
+                    
+                case 'all':
+                    filteredExpenses = allExpenses;
+                    title = 'All Payment History';
+                    description = 'Complete expense history';
+                    break;
+            }
+            
+            const container = document.getElementById(tabName === 'in-progress' ? 'inProgressList' : tabName + 'List');
+            
+            if (filteredExpenses.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox display-4 text-muted mb-3"></i>
+                        <h5>No expenses found</h5>
+                        <p class="text-muted">No expenses match this category</p>
+                    </div>
+                `;
+                
+                if (tabName === 'awaiting') {
+                    document.getElementById('noAwaiting').style.display = 'block';
+                } else {
+                    document.getElementById('noAwaiting').style.display = 'none';
+                }
+                return;
+            }
+            
+            if (tabName === 'awaiting') {
+                document.getElementById('noAwaiting').style.display = 'none';
+            }
+            
+            // Sort by urgency and date
+            filteredExpenses.sort((a, b) => {
+                // Urgent first
+                if (a.urgency === 'critical' && b.urgency !== 'critical') return -1;
+                if (b.urgency === 'critical' && a.urgency !== 'critical') return 1;
+                
+                // Then by date (newest first)
+                const dateA = new Date(a.submittedDate || a.date);
+                const dateB = new Date(b.submittedDate || b.date);
+                return dateB - dateA;
+            });
+            
+            let html = '';
+            filteredExpenses.forEach(expense => {
+                const statusBadge = getStatusBadge(expense);
+                const actions = getActionButtons(expense);
+                const approvalFlow = getApprovalFlow(expense);
+                
+                html += `
+                    <div class="payment-card ${expense.paymentStatus === 'paid' ? 'paid' : expense.status === 'approved' ? 'approved' : ''}">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h5>${expense.project || 'No Project'}</h5>
+                                <p class="mb-1">${expense.name || 'Unknown'} • ${expense.division || 'Unknown'} • ${formatDate(expense.date)}</p>
+                                <p class="text-muted mb-2">${expense.description || 'No description'}</p>
+                                <div class="approval-flow mb-2">${approvalFlow}</div>
+                                <p class="mb-0">
+                                    <small class="text-muted">
+                                        Manager: ${expense.manager || 'Unknown'} • 
+                                        Payment Method: ${expense.paymentMethod || 'Not specified'}
+                                        ${expense.subApprovedBy ? ` • Sub Approved by: ${expense.subApprovedBy}` : ''}
+                                        ${expense.approvedBy ? ` • Approved by: ${expense.approvedBy}` : ''}
+                                        ${expense.paidBy ? ` • Paid by: ${expense.paidBy}` : ''}
+                                        ${expense.hasAttachment ? ' • <i class="bi bi-paperclip"></i> Bukti Tersedia' : ''}
+                                    </small>
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <h4 class="text-primary">Rp ${formatCurrency(expense.amount || 0)}</h4>
+                                <div class="mb-2">${statusBadge}</div>
+                                ${expense.urgency === 'critical' ? '<span class="badge bg-danger">URGENT</span>' : 
+                                  expense.urgency === 'urgent' ? '<span class="badge bg-warning text-dark">URGENT</span>' : ''}
+                                ${expense.paymentStatus === 'paid' ? 
+                                    `<small class="text-muted d-block">Paid on: ${formatDate(expense.paymentDate)}</small>` : ''}
+                                ${actions}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function getApprovalFlow(expense) {
+            let steps = [];
+            let currentStep = 0;
+            
+            if (expense.manager === 'Achmad Oskar Wiriadidjaja' && expense.status === 'pending-main') {
+                // Direct approval flow
+                steps = ['Request', 'Main Approval', 'Payment'];
+                if (expense.status === 'pending-main') currentStep = 1;
+                else if (expense.status === 'approved') currentStep = 2;
+                else if (expense.paymentStatus === 'paid') currentStep = 3;
+            } else {
+                // Normal 2-step flow
+                steps = ['Request', 'Sub Approval', 'Main Approval', 'Payment'];
+                if (expense.status === 'pending') currentStep = 1;
+                else if (expense.status === 'sub-approved') currentStep = 2;
+                else if (expense.status === 'approved') currentStep = 3;
+                else if (expense.paymentStatus === 'paid') currentStep = 4;
+            }
+            
+            let html = '';
+            for (let i = 0; i < steps.length; i++) {
+                let stepClass = '';
+                if (i < currentStep) stepClass = 'completed';
+                else if (i === currentStep) stepClass = 'active';
+                
+                html += `<span class="step ${stepClass}">${steps[i]}</span>`;
+            }
+            return html;
+        }
+
+        function getStatusBadge(expense) {
+            if (expense.paymentStatus === 'paid') {
+                return '<span class="status-badge badge-paid">PAID</span>';
+            }
+            
+            switch(expense.status) {
+                case 'pending': 
+                    return '<span class="status-badge badge-awaiting">PENDING SUB</span>';
+                case 'pending-main': 
+                    return '<span class="status-badge badge-pending-main">PENDING MAIN</span>';
+                case 'sub-approved': 
+                    return '<span class="status-badge badge-sub-approved">SUB APPROVED</span>';
+                case 'approved': 
+                    return '<span class="status-badge badge-approved">APPROVED</span>';
+                case 'rejected': 
+                    return '<span class="status-badge badge-rejected">REJECTED</span>';
+                default: 
+                    return '<span class="badge bg-secondary">' + (expense.status || 'UNKNOWN') + '</span>';
+            }
+        }
+
+        function getActionButtons(expense) {
+            if (expense.status === 'approved' && (!expense.paymentStatus || expense.paymentStatus !== 'paid')) {
+                return `
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-process" onclick="markAsPaid('${expense.id}')">
+                            <i class="bi bi-check"></i> Mark as Paid
+                        </button>
+                        <button class="btn btn-sm btn-outline-info ms-2" onclick="viewExpense('${expense.id}')">
+                            <i class="bi bi-eye"></i> View
+                        </button>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="viewExpense('${expense.id}')">
+                            <i class="bi bi-eye"></i> View Details
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        async function markAsPaid(expenseId) {
+            const expense = allExpenses.find(item => item.id === expenseId);
+            if (!expense) {
+                alert('Expense not found!');
+                return;
+            }
+            
+            if (confirm(`Mark expense as paid?\n\nProject: ${expense.project}\nAmount: Rp ${formatCurrency(expense.amount)}`)) {
+                const paymentDate = prompt('Enter payment date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+                const paymentMethod = prompt('Enter payment method:', expense.paymentMethod || 'Bank Transfer');
+                const paidBy = prompt('Enter processor name:', 'Financing Department');
+                
+                if (paymentDate && paymentMethod && paidBy) {
+                    await updatePaymentStatus(expenseId, paymentDate, paymentMethod, paidBy);
+                }
+            }
+        }
+
+        async function updatePaymentStatus(expenseId, paymentDate, paymentMethod, paidBy) {
+            try {
+                const updateData = {
+                    paymentStatus: 'paid',
+                    paymentDate: paymentDate,
+                    paymentMethod: paymentMethod,
+                    paidBy: paidBy,
+                    status: 'paid',
+                    lastUpdated: new Date().toISOString()
+                };
+                
+                // Update in Airtable
+                const result = await window.airtableService.updateExpense(expenseId, updateData);
+                
+                if (result.success) {
+                    alert('✅ Payment recorded successfully!\n\nExpense marked as PAID.');
+                    loadExpenses();
+                } else {
+                    alert(`⚠️ Payment recorded locally. Airtable error: ${result.error}`);
+                    loadExpenses();
+                }
+                
+            } catch (error) {
+                console.error('Error updating payment:', error);
+                alert('Error recording payment.');
+            }
+        }
+
+        async function processAllApproved() {
+            const approvedExpenses = allExpenses.filter(item => 
+                item.status === 'approved' && 
+                (!item.paymentStatus || item.paymentStatus !== 'paid')
+            );
+            
+            if (approvedExpenses.length === 0) {
+                alert('No approved expenses awaiting payment.');
+                return;
+            }
+            
+            const totalAmount = approvedExpenses.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+            
+            if (confirm(`Process ALL ${approvedExpenses.length} approved expenses as paid?\n\nTotal Amount: Rp ${formatCurrency(totalAmount)}`)) {
+                try {
+                    const paymentDate = new Date().toISOString().split('T')[0];
+                    const paidBy = 'Financing Department (Batch)';
+                    
+                    let successCount = 0;
+                    let errorCount = 0;
+                    
+                    for (const expense of approvedExpenses) {
+                        try {
+                            const updateData = {
+                                paymentStatus: 'paid',
+                                paymentDate: paymentDate,
+                                paymentMethod: 'Batch Processing',
+                                paidBy: paidBy,
+                                status: 'paid',
+                                lastUpdated: new Date().toISOString()
+                            };
+                            
+                            const result = await window.airtableService.updateExpense(expense.id, updateData);
+                            if (result.success) {
+                                successCount++;
+                            } else {
+                                errorCount++;
+                            }
+                            
+                        } catch (error) {
+                            console.error(`Error processing ${expense.id}:`, error);
+                            errorCount++;
+                        }
+                    }
+                    
+                    const message = successCount > 0 
+                        ? `✅ Processed ${successCount} expenses as paid!\nTotal: Rp ${formatCurrency(totalAmount)}`
+                        : '❌ Failed to process payments.';
+                    
+                    if (errorCount > 0) {
+                        alert(`${message}\n\n${errorCount} expenses failed to sync with Airtable.`);
+                    } else {
+                        alert(message);
+                    }
+                    
+                    loadExpenses();
+                    
+                } catch (error) {
+                    console.error('Error batch processing:', error);
+                    alert('Error processing payments.');
+                }
+            }
+        }
+
+        function viewExpense(expenseId) {
+            const expense = allExpenses.find(item => item.id === expenseId);
+            if (expense) {
+                let details = `Expense Details:\n\n` +
+                      `ID: ${expense.id}\n` +
+                      `Project: ${expense.project}\n` +
+                      `Employee: ${expense.name}\n` +
+                      `Division: ${expense.division}\n` +
+                      `Amount: Rp ${formatCurrency(expense.amount)}\n` +
+                      `Status: ${expense.status}\n` +
+                      `Payment Status: ${expense.paymentStatus || 'Not paid'}\n` +
+                      `Manager: ${expense.manager}\n` +
+                      `Submitted: ${formatDate(expense.submittedDate)}\n`;
+                
+                if (expense.subApprovedBy) {
+                    details += `Sub Approved by: ${expense.subApprovedBy} on ${expense.subApprovedDate}\n`;
+                }
+                if (expense.approvedBy) {
+                    details += `Approved by: ${expense.approvedBy} on ${expense.approvalDate}\n`;
+                }
+                if (expense.paymentDate) {
+                    details += `Payment Date: ${expense.paymentDate}\n`;
+                    details += `Payment Method: ${expense.paymentMethod}\n`;
+                    details += `Paid by: ${expense.paidBy}\n`;
+                }
+                if (expense.rejectionReason) {
+                    details += `Rejection Reason: ${expense.rejectionReason}\n`;
+                }
+                details += `Description: ${expense.description || 'No description'}`;
+                
+                alert(details);
+            }
+        }
+
+        async function refreshData() {
+            await loadExpenses();
+            alert('Data refreshed!');
+        }
+
+        function checkData() {
+            const pending = allExpenses.filter(item => item.status === 'pending').length;
+            const pendingMain = allExpenses.filter(item => item.status === 'pending-main').length;
+            const subApproved = allExpenses.filter(item => item.status === 'sub-approved').length;
+            const approved = allExpenses.filter(item => item.status === 'approved').length;
+            const paid = allExpenses.filter(item => item.paymentStatus === 'paid').length;
+            const rejected = allExpenses.filter(item => item.status === 'rejected').length;
+            
+            const totalPaid = allExpenses
+                .filter(item => item.paymentStatus === 'paid')
+                .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+            
+            alert(`Payment System Data Check:\n\n` +
+                  `Total Expenses: ${allExpenses.length}\n` +
+                  `Pending Sub Approval: ${pending}\n` +
+                  `Pending Main Approval: ${pendingMain}\n` +
+                  `Sub Approved: ${subApproved}\n` +
+                  `Fully Approved (Awaiting Payment): ${approved}\n` +
+                  `Paid: ${paid}\n` +
+                  `Rejected: ${rejected}\n\n` +
+                  `Total Paid Amount: Rp ${formatCurrency(totalPaid)}\n\n` +
+                  `Connection: ${isOnline ? 'Online (Airtable)' : 'Offline (Local)'}`);
+        }
+
+        function formatCurrency(amount) {
+            return parseFloat(amount || 0).toLocaleString('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                return new Date(dateString).toLocaleDateString('id-ID');
+            } catch (e) {
+                return dateString;
+            }
+        }
+    </script>
+</body>
+</html>

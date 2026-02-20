@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Expense System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    
+    <!-- AIRTABLE API -->
+    <script src="api.js"></script>
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #2c3e50 0%, #1a2530 100%);
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-left: 5px solid #3498db;
+            transition: transform 0.3s;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+        }
+        .stat-card.pending { border-left-color: #f39c12; }
+        .stat-card.pending-main { border-left-color: #e67e22; }
+        .stat-card.sub-approved { border-left-color: #3498db; }
+        .stat-card.approved { border-left-color: #2ecc71; }
+        .stat-card.paid { border-left-color: #9b59b6; }
+        .stat-card.rejected { border-left-color: #e74c3c; }
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .module-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            transition: transform 0.3s;
+            height: 100%;
+        }
+        .module-card:hover {
+            transform: translateY(-5px);
+        }
+        .module-icon {
+            font-size: 40px;
+            margin-bottom: 15px;
+        }
+        .module-card.submit .module-icon { color: #2ecc71; }
+        .module-card.approve .module-icon { color: #f39c12; }
+        .module-card.payment .module-icon { color: #9b59b6; }
+        .recent-table {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-pending-main { background: #e67e22; color: white; }
+        .badge-sub-approved { background: #cce5ff; color: #004085; }
+        .badge-approved { background: #d4edda; color: #155724; }
+        .badge-paid { background: #2ecc71; color: white; }
+        .badge-rejected { background: #f8d7da; color: #721c24; }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        .export-btn {
+            transition: all 0.3s;
+        }
+        
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .division-tabs .nav-link {
+            border-radius: 5px;
+            margin-right: 5px;
+            font-weight: 500;
+        }
+        
+        .division-tabs .nav-link.active {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .category-table th {
+            background-color: #f8f9fa;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .total-row {
+            background-color: #e8f4fd !important;
+            font-weight: bold;
+        }
+        
+        .division-row {
+            background-color: #f8f9fa !important;
+            font-weight: 600;
+        }
+        
+        .amount-cell {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .approval-flow {
+            font-size: 11px;
+            margin-top: 5px;
+        }
+        .approval-flow .step {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 8px;
+            margin-right: 3px;
+            background: #eee;
+            font-size: 10px;
+        }
+        .approval-flow .step.active {
+            background: #f39c12;
+            color: white;
+        }
+        .approval-flow .step.completed {
+            background: #2ecc71;
+            color: white;
+        }
+        
+        .dashboard-alert {
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .sync-status {
+            font-size: 12px;
+        }
+        .sync-online { color: #2ecc71; }
+        .sync-offline { color: #e74c3c; }
+        .sync-syncing { color: #f39c12; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="Dashboard.html">
+                <i class="bi bi-wallet2"></i> Expense System
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="Dashboard.html">
+                            <i class="bi bi-house-door"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="Form.html">
+                            <i class="bi bi-plus-circle"></i> Submit
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="Approval.html">
+                            <i class="bi bi-check-circle"></i> Approve
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="Payment.html">
+                            <i class="bi bi-credit-card"></i> Pay
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="h3"><i class="bi bi-speedometer2"></i> Expense System Dashboard</h1>
+                <p class="text-muted">Complete overview of expense management workflow</p>
+                
+                <!-- System Status Alert -->
+                <div class="dashboard-alert">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6><i class="bi bi-info-circle"></i> Current System Status</h6>
+                            <p class="mb-2 small">Tracking expenses across: <strong>Submit → Sub Approval → Main Approval → Payment</strong></p>
+                            <div class="small text-muted" id="systemStatus">
+                                Loading system status...
+                            </div>
+                        </div>
+                        <div class="sync-status" id="connectionStatus">
+                            <span class="badge bg-secondary">Checking...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="stat-card">
+                    <div class="stat-label text-muted">Total Expenses</div>
+                    <div class="stat-value" id="totalExpenses">0</div>
+                    <small class="text-muted">All time</small>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="stat-card pending">
+                    <div class="stat-label text-muted">Pending</div>
+                    <div class="stat-value" id="pendingCount">0</div>
+                    <small class="text-muted">Awaiting sub-approval</small>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="stat-card pending-main">
+                    <div class="stat-label text-muted">Pending Main</div>
+                    <div class="stat-value" id="pendingMainCount">0</div>
+                    <small class="text-muted">Direct to Achmad Oskar</small>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="stat-card sub-approved">
+                    <div class="stat-label text-muted">Sub Approved</div>
+                    <div class="stat-value" id="subApprovedCount">0</div>
+                    <small class="text-muted">Ready for main approval</small>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="stat-card approved">
+                    <div class="stat-label text-muted">Approved</div>
+                    <div class="stat-value" id="approvedCount">0</div>
+                    <small class="text-muted">Ready for payment</small>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="stat-card paid">
+                    <div class="stat-label text-muted">Total Paid</div>
+                    <div class="stat-value" id="totalPaid">Rp 0</div>
+                    <small class="text-muted">Completed payments</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Chart Section -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0"><i class="bi bi-bar-chart"></i> Expense Trends</h5>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary active" onclick="setChartTimeRange('month')">Monthly</button>
+                            <button class="btn btn-outline-secondary" onclick="setChartTimeRange('week')">Weekly</button>
+                            <button class="btn btn-outline-secondary" onclick="setChartTimeRange('quarter')">Quarterly</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="expenseChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0"><i class="bi bi-pie-chart"></i> Status Distribution</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Expenses & Quick Actions -->
+        <div class="row mb-4">
+            <!-- Recent Expenses -->
+            <div class="col-md-8">
+                <div class="recent-table">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="mb-0"><i class="bi bi-clock-history"></i> Recent Expenses</h4>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary active" onclick="filterRecent('all')">All</button>
+                            <button class="btn btn-outline-secondary" onclick="filterRecent('pending')">Pending</button>
+                            <button class="btn btn-outline-secondary" onclick="filterRecent('approved')">Approved</button>
+                            <button class="btn btn-outline-secondary" onclick="filterRecent('paid')">Paid</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Employee</th>
+                                    <th>Project</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentExpenses">
+                                <!-- Data will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="noExpenses" class="text-center py-4" style="display: none;">
+                        <i class="bi bi-inbox display-4 text-muted mb-3"></i>
+                        <h5>No expenses found</h5>
+                        <p class="text-muted">Submit your first expense request</p>
+                        <a href="Form.html" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Submit Expense
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+<!-- Quick Actions - VERSI RINGKAS -->
+<div class="col-md-4">
+    <div class="card h-100">
+        <div class="card-header bg-light">
+            <h5 class="card-title mb-0"><i class="bi bi-lightning-charge"></i> Quick Actions</h5>
+        </div>
+        <div class="card-body p-3">
+            <div class="d-flex justify-content-around text-center">
+                <a href="Form.html" class="text-decoration-none">
+                    <div class="rounded-circle bg-success bg-opacity-10 p-3 mb-2 d-inline-block">
+                        <i class="bi bi-plus-circle text-success fs-4"></i>
+                    </div>
+                    <h6 class="mb-0">Submit</h6>
+                    <small class="text-muted">New Expense</small>
+                </a>
+                
+                <a href="Approval.html" class="text-decoration-none">
+                    <div class="rounded-circle bg-warning bg-opacity-10 p-3 mb-2 d-inline-block">
+                        <i class="bi bi-check-circle text-warning fs-4"></i>
+                    </div>
+                    <h6 class="mb-0">Approve</h6>
+                    <small class="text-muted">Pending</small>
+                </a>
+                
+                <a href="Payment.html" class="text-decoration-none">
+                    <div class="rounded-circle bg-info bg-opacity-10 p-3 mb-2 d-inline-block">
+                        <i class="bi bi-credit-card text-info fs-4"></i>
+                    </div>
+                    <h6 class="mb-0">Payment</h6>
+                    <small class="text-muted">Process</small>
+                </a>
+                
+                <button onclick="exportToExcel()" class="text-decoration-none border-0 bg-transparent">
+                    <div class="rounded-circle bg-success bg-opacity-10 p-3 mb-2 d-inline-block">
+                        <i class="bi bi-file-excel text-success fs-4"></i>
+                    </div>
+                    <h6 class="mb-0">Export</h6>
+                    <small class="text-muted">to Excel</small>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+        <!-- System Overview -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0"><i class="bi bi-diagram-3"></i> System Workflow Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <div class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </div>
+                                    <h6 class="mt-2">Submit</h6>
+                                    <p class="small text-muted mb-1">Employee submits expense</p>
+                                    <span class="badge bg-primary" id="submitCount">0</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <div class="rounded-circle bg-warning text-white d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                        <i class="bi bi-person-check"></i>
+                                    </div>
+                                    <h6 class="mt-2">Sub Approval</h6>
+                                    <p class="small text-muted mb-1">Manager reviews</p>
+                                    <span class="badge bg-warning" id="subApprovalCount">0</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <div class="rounded-circle bg-success text-white d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                        <i class="bi bi-check-all"></i>
+                                    </div>
+                                    <h6 class="mt-2">Main Approval</h6>
+                                    <p class="small text-muted mb-1">Final approval</p>
+                                    <span class="badge bg-success" id="mainApprovalCount">0</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <div class="rounded-circle bg-info text-white d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                        <i class="bi bi-cash-coin"></i>
+                                    </div>
+                                    <h6 class="mt-2">Payment</h6>
+                                    <p class="small text-muted mb-1">Finance processes</p>
+                                    <span class="badge bg-info" id="paymentCount">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Debug Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <i class="bi bi-tools"></i> System Debug & Maintenance
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6>Data Storage Status</h6>
+                                <div class="mb-2">
+                                    <span class="badge bg-secondary" id="storageStatus">Checking...</span>
+                                </div>
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-outline-primary me-2" onclick="checkData()">
+                                        <i class="bi bi-search"></i> Check Data
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success me-2" onclick="migrateToAirtable()">
+                                        <i class="bi bi-cloud-upload"></i> Migrate to Airtable
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="clearData()">
+                                        <i class="bi bi-trash"></i> Clear Local Data
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>Connection Status</h6>
+                                <div class="mb-3">
+                                    <div id="airtableStatus" class="small">
+                                        <i class="bi bi-hourglass-split"></i> Testing Airtable connection...
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-outline-info me-2" onclick="testAirtableConnection()">
+                                    <i class="bi bi-wifi"></i> Test Connection
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>System Sync Status</h6>
+                                <div class="mb-3">
+                                    <span class="badge bg-success" id="syncStatus">Synchronized</span>
+                                </div>
+                                <button class="btn btn-sm btn-outline-info me-2" onclick="syncAllData()">
+                                    <i class="bi bi-arrow-repeat"></i> Force Sync
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="repairData()">
+                                    <i class="bi bi-wrench"></i> Repair Data
+                                </button>
+<button class="btn btn-sm btn-outline-success me-2" onclick="exportToExcel()">
+    <i class="bi bi-file-excel"></i> Export to Excel
+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+<script src="sync-manager.js"></script>
+<script>
+// OVERRIDE FUNGSI UNTUK DASHBOARD.HTML
+
+// Simpan fungsi asli
+const originalLoadDashboardData = window.loadDashboardData;
+
+// Override loadDashboardData
+window.loadDashboardData = async function() {
+    try {
+        console.log('Loading consolidated data for dashboard...');
+        
+        if (window.airtableService && window.airtableService.getConsolidatedData) {
+            allExpenses = await window.airtableService.getConsolidatedData();
+            console.log(`Loaded ${allExpenses.length} consolidated expenses`);
+            
+            // Update statistics (salin dari fungsi asli)
+            const totalExpenses = allExpenses.length;
+            const pendingCount = allExpenses.filter(item => item.status === 'pending').length;
+            const pendingMainCount = allExpenses.filter(item => item.status === 'pending-main').length;
+            const subApprovedCount = allExpenses.filter(item => item.status === 'sub-approved').length;
+            const approvedCount = allExpenses.filter(item => item.status === 'approved').length;
+            const paidCount = allExpenses.filter(item => item.paymentStatus === 'paid').length;
+            
+            const totalPaid = allExpenses
+                .filter(item => item.paymentStatus === 'paid')
+                .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+            
+            // Update UI
+            document.getElementById('totalExpenses').textContent = totalExpenses;
+            document.getElementById('pendingCount').textContent = pendingCount;
+            document.getElementById('pendingMainCount').textContent = pendingMainCount;
+            document.getElementById('subApprovedCount').textContent = subApprovedCount;
+            document.getElementById('approvedCount').textContent = approvedCount;
+            document.getElementById('totalPaid').textContent = 'Rp ' + formatCurrency(totalPaid);
+            
+            document.getElementById('submitCount').textContent = totalExpenses;
+            document.getElementById('subApprovalCount').textContent = pendingCount + subApprovedCount;
+            document.getElementById('mainApprovalCount').textContent = pendingMainCount + approvedCount;
+            document.getElementById('paymentCount').textContent = paidCount;
+            
+            updateRecentExpenses(allExpenses);
+            updateSystemStatus(allExpenses);
+            
+            // Update storage status
+            const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
+            document.getElementById('storageStatus').textContent = 
+                `Airtable: ${allExpenses.length} • Local: ${localData.length}`;
+            
+            updateCharts(allExpenses);
+            
+            // Update connection status
+            if (window.SyncManager) {
+                const status = window.SyncManager.getConnectionStatus();
+                const connectionStatus = document.getElementById('connectionStatus');
+                const syncStatus = document.getElementById('syncStatus');
+                
+                if (connectionStatus) {
+                    connectionStatus.innerHTML = status.isOnline ? 
+                        '<span class="badge bg-success">Online (Airtable)</span>' : 
+                        '<span class="badge bg-warning">Offline (Local)</span>';
+                }
+                if (syncStatus) {
+                    syncStatus.textContent = status.isOnline ? 'Synchronized' : 'Offline';
+                    syncStatus.className = status.isOnline ? 'badge bg-success' : 'badge bg-warning';
+                }
+            }
+            
+        } else {
+            if (originalLoadDashboardData) await originalLoadDashboardData();
+        }
+    } catch (error) {
+        console.error('Error loading consolidated data:', error);
+        if (originalLoadDashboardData) await originalLoadDashboardData();
+    }
+};
+
+// Fungsi manual sync
+function manualSync() {
+    if (window.SyncManager) {
+        window.SyncManager.manualSync();
+    } else {
+        alert('Sync Manager not available');
+    }
+}
+</script>
+  
+    <script>
+        let expenseChart = null;
+        let statusChart = null;
+        let currentRecentFilter = 'all';
+        let chartTimeRange = 'month';
+        let allExpenses = [];
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Dashboard loaded - Airtable Version');
+            
+            // Update navigation active state
+            const currentPage = window.location.pathname.split('/').pop();
+            document.querySelectorAll('.nav-link').forEach(link => {
+                if (link.getAttribute('href') === currentPage) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+            
+            // Check Airtable connection
+            testAirtableConnection();
+            
+            // Load dashboard data
+            loadDashboardData();
+            
+            // Auto-refresh every 10 seconds
+            setInterval(loadDashboardData, 10000);
+        });
+
+        async function loadDashboardData() {
+            try {
+                console.log('Loading data from Airtable...');
+                
+                // Show loading state
+                document.getElementById('connectionStatus').innerHTML = 
+                    '<span class="badge bg-warning">Syncing...</span>';
+                
+                // Load from Airtable
+                allExpenses = await window.airtableService.getAllExpenses();
+                console.log(`Loaded ${allExpenses.length} expenses from Airtable`);
+                
+                // Calculate complete statistics
+                const totalExpenses = allExpenses.length;
+                
+                // Status counts
+                const pendingCount = allExpenses.filter(item => item.status === 'pending').length;
+                const pendingMainCount = allExpenses.filter(item => item.status === 'pending-main').length;
+                const subApprovedCount = allExpenses.filter(item => item.status === 'sub-approved').length;
+                const approvedCount = allExpenses.filter(item => item.status === 'approved').length;
+                const rejectedCount = allExpenses.filter(item => item.status === 'rejected').length;
+                const paidCount = allExpenses.filter(item => item.paymentStatus === 'paid').length;
+                
+                // Calculate total paid amount
+                const totalPaid = allExpenses
+                    .filter(item => item.paymentStatus === 'paid')
+                    .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+                
+                // Update statistics cards
+                document.getElementById('totalExpenses').textContent = totalExpenses;
+                document.getElementById('pendingCount').textContent = pendingCount;
+                document.getElementById('pendingMainCount').textContent = pendingMainCount;
+                document.getElementById('subApprovedCount').textContent = subApprovedCount;
+                document.getElementById('approvedCount').textContent = approvedCount;
+                document.getElementById('totalPaid').textContent = 'Rp ' + formatCurrency(totalPaid);
+                
+                // Update system workflow overview
+                document.getElementById('submitCount').textContent = totalExpenses;
+                document.getElementById('subApprovalCount').textContent = pendingCount + subApprovedCount;
+                document.getElementById('mainApprovalCount').textContent = pendingMainCount + approvedCount;
+                document.getElementById('paymentCount').textContent = paidCount;
+                
+                // Update recent expenses table
+                updateRecentExpenses(allExpenses);
+                
+                // Update system status
+                updateSystemStatus(allExpenses);
+                
+                // Update storage status
+                const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
+                document.getElementById('storageStatus').textContent = 
+                    `Airtable: ${allExpenses.length} • Local: ${localData.length}`;
+                
+                // Update charts
+                updateCharts(allExpenses);
+                
+                // Update sync status
+                document.getElementById('syncStatus').textContent = 'Synchronized';
+                document.getElementById('syncStatus').className = 'badge bg-success';
+                
+                // Update connection status
+                document.getElementById('connectionStatus').innerHTML = 
+                    `<span class="badge bg-success">Online (${allExpenses.length} records)</span>`;
+                
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                
+                document.getElementById('connectionStatus').innerHTML = 
+                    '<span class="badge bg-danger">Offline</span>';
+                
+                document.getElementById('storageStatus').textContent = 'Error: ' + error.message;
+                document.getElementById('syncStatus').textContent = 'Error';
+                document.getElementById('syncStatus').className = 'badge bg-danger';
+                
+                // Show local data if Airtable fails
+                const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
+                if (localData.length > 0) {
+                    alert('⚠️ Using local data. Airtable connection failed.');
+                    allExpenses = localData;
+                    updateRecentExpenses(localData);
+                }
+            }
+        }
+
+        async function testAirtableConnection() {
+            try {
+                document.getElementById('airtableStatus').innerHTML = 
+                    '<i class="bi bi-hourglass-split"></i> Testing connection...';
+                
+                const testData = await window.airtableService.getAllExpenses();
+                
+                document.getElementById('airtableStatus').innerHTML = 
+                    `<i class="bi bi-check-circle text-success"></i> Connected! (${testData.length} records)`;
+                
+                return true;
+            } catch (error) {
+                document.getElementById('airtableStatus').innerHTML = 
+                    `<i class="bi bi-x-circle text-danger"></i> Connection failed: ${error.message}`;
+                return false;
+            }
+        }
+
+        function updateSystemStatus(submissions) {
+            const total = submissions.length;
+            const pending = submissions.filter(item => item.status === 'pending' || item.status === 'pending-main' || item.status === 'sub-approved').length;
+            const approved = submissions.filter(item => item.status === 'approved').length;
+            const paid = submissions.filter(item => item.paymentStatus === 'paid').length;
+            
+            let statusText = '';
+            
+            if (total === 0) {
+                statusText = 'No expenses in system. Ready for new submissions.';
+            } else {
+                statusText = `${total} total expenses • ${pending} in approval process • ${approved} approved awaiting payment • ${paid} paid`;
+                
+                if (pending > 0) {
+                    const urgentCount = submissions.filter(item => 
+                        (item.status === 'pending' || item.status === 'pending-main' || item.status === 'sub-approved') && 
+                        item.urgency === 'critical'
+                    ).length;
+                    
+                    if (urgentCount > 0) {
+                        statusText += ` • <span class="text-danger">${urgentCount} URGENT items need attention</span>`;
+                    }
+                }
+            }
+            
+            document.getElementById('systemStatus').innerHTML = statusText;
+        }
+
+        function updateRecentExpenses(submissions) {
+            const recentExpensesBody = document.getElementById('recentExpenses');
+            const noExpensesDiv = document.getElementById('noExpenses');
+            
+            if (submissions.length === 0) {
+                recentExpensesBody.innerHTML = '';
+                noExpensesDiv.style.display = 'block';
+                return;
+            }
+            
+            noExpensesDiv.style.display = 'none';
+            
+            // Sort by date (newest first)
+            const sorted = submissions.sort((a, b) => {
+                const dateA = new Date(a.submittedDate || a.date);
+                const dateB = new Date(b.submittedDate || b.date);
+                return dateB - dateA;
+            });
+            
+            // Apply filter
+            let filtered = sorted;
+            if (currentRecentFilter !== 'all') {
+                if (currentRecentFilter === 'pending') {
+                    filtered = sorted.filter(item => 
+                        item.status === 'pending' || item.status === 'pending-main' || item.status === 'sub-approved'
+                    );
+                } else if (currentRecentFilter === 'approved') {
+                    filtered = sorted.filter(item => item.status === 'approved');
+                } else if (currentRecentFilter === 'paid') {
+                    filtered = sorted.filter(item => item.paymentStatus === 'paid');
+                }
+            }
+            
+            // Take only 10 most recent
+            const recent = filtered.slice(0, 10);
+            
+            let html = '';
+            recent.forEach(expense => {
+                const status = expense.status || 'pending';
+                const paymentStatus = expense.paymentStatus || 'pending';
+                const date = formatDate(expense.date || expense.submittedDate);
+                const name = expense.name || 'Unknown';
+                const project = expense.project || 'N/A';
+                const amount = formatCurrency(expense.amount || 0);
+                const approvalFlow = getApprovalFlow(expense);
+                
+                let statusBadge = '';
+                if (paymentStatus === 'paid') {
+                    statusBadge = '<span class="status-badge badge-paid">Paid</span>';
+                } else if (status === 'approved') {
+                    statusBadge = '<span class="status-badge badge-approved">Approved</span>';
+                } else if (status === 'sub-approved') {
+                    statusBadge = '<span class="status-badge badge-sub-approved">Sub Approved</span>';
+                } else if (status === 'pending-main') {
+                    statusBadge = '<span class="status-badge badge-pending-main">Pending Main</span>';
+                } else if (status === 'pending') {
+                    statusBadge = '<span class="status-badge badge-pending">Pending</span>';
+                } else if (status === 'rejected') {
+                    statusBadge = '<span class="status-badge badge-rejected">Rejected</span>';
+                }
+                
+                html += `
+                <tr>
+                    <td>${date}</td>
+                    <td>
+                        <div>${name}</div>
+                        <small class="text-muted">${expense.division || ''}</small>
+                    </td>
+                    <td>${project}</td>
+                    <td class="amount-cell">Rp ${amount}</td>
+                    <td>
+                        ${statusBadge}
+                        <div class="approval-flow">${approvalFlow}</div>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-info" onclick="viewExpense('${expense.id}')">
+                            <i class="bi bi-eye"></i> View
+                        </button>
+                        ${expense.status === 'approved' && expense.paymentStatus !== 'paid' ? 
+                            `<button class="btn btn-sm btn-outline-success ms-1" onclick="goToPayment('${expense.id}')">
+                                <i class="bi bi-credit-card"></i> Pay
+                            </button>` : ''}
+                    </td>
+                </tr>
+                `;
+            });
+            
+            recentExpensesBody.innerHTML = html;
+        }
+
+        function filterRecent(filter) {
+            currentRecentFilter = filter;
+            
+            // Update button states
+            document.querySelectorAll('.recent-table .btn-group .btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            updateRecentExpenses(allExpenses);
+        }
+
+        function goToPayment(expenseId) {
+            window.location.href = `Payment.html?expense=${expenseId}`;
+        }
+
+        function getApprovalFlow(expense) {
+            let steps = [];
+            let currentStep = 0;
+            
+            if (expense.manager === 'Achmad Oskar Wiriadidjaja' && expense.status === 'pending-main') {
+                // Direct approval flow
+                steps = ['Request', 'Main Approval', 'Payment'];
+                if (expense.status === 'pending-main') currentStep = 1;
+                else if (expense.status === 'approved') currentStep = 2;
+                else if (expense.paymentStatus === 'paid') currentStep = 3;
+            } else {
+                // Normal 2-step flow
+                steps = ['Request', 'Sub Approval', 'Main Approval', 'Payment'];
+                if (expense.status === 'pending') currentStep = 1;
+                else if (expense.status === 'sub-approved') currentStep = 2;
+                else if (expense.status === 'approved') currentStep = 3;
+                else if (expense.paymentStatus === 'paid') currentStep = 4;
+            }
+            
+            let html = '';
+            for (let i = 0; i < steps.length; i++) {
+                let stepClass = '';
+                if (i < currentStep) stepClass = 'completed';
+                else if (i === currentStep) stepClass = 'active';
+                
+                html += `<span class="step ${stepClass}">${steps[i]}</span>`;
+            }
+            return html;
+        }
+
+        function updateCharts(expenses) {
+            updateExpenseTrendChart(expenses);
+            updateStatusChart(expenses);
+        }
+
+        function setChartTimeRange(range) {
+            chartTimeRange = range;
+            
+            // Update button states
+            document.querySelectorAll('.btn-group .btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            updateExpenseTrendChart(allExpenses);
+        }
+
+        function updateExpenseTrendChart(expenses) {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            
+            let monthlyData = {};
+            let labels = [];
+            let amounts = [];
+            
+            if (expenses.length === 0) {
+                // Show empty chart
+                labels = ['No Data'];
+                amounts = [0];
+            } else {
+                // Group data based on time range
+                const today = new Date();
+                
+                if (chartTimeRange === 'month') {
+                    // Last 6 months
+                    for (let i = 5; i >= 0; i--) {
+                        const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                        const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                        const monthName = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                        
+                        labels.push(monthName);
+                        monthlyData[monthYear] = 0;
+                    }
+                } else if (chartTimeRange === 'week') {
+                    // Last 8 weeks
+                    for (let i = 7; i >= 0; i--) {
+                        const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i * 7);
+                        const weekNumber = Math.floor((date.getDate() - 1) / 7) + 1;
+                        const label = `W${weekNumber} ${date.toLocaleDateString('en-US', { month: 'short' })}`;
+                        
+                        labels.push(label);
+                        const weekKey = `${date.getFullYear()}-W${weekNumber}`;
+                        monthlyData[weekKey] = 0;
+                    }
+                } else if (chartTimeRange === 'quarter') {
+                    // Last 4 quarters
+                    for (let i = 3; i >= 0; i--) {
+                        const quarter = Math.floor(today.getMonth() / 3) + 1 - i;
+                        const year = today.getFullYear() - (quarter <= 0 ? 1 : 0);
+                        const actualQuarter = quarter <= 0 ? quarter + 4 : quarter;
+                        const label = `Q${actualQuarter} ${year}`;
+                        
+                        labels.push(label);
+                        monthlyData[`${year}-Q${actualQuarter}`] = 0;
+                    }
+                }
+                
+                // Populate data
+                expenses.forEach(expense => {
+                    const date = new Date(expense.date || expense.submittedDate);
+                    let key = '';
+                    
+                    if (chartTimeRange === 'month') {
+                        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                    } else if (chartTimeRange === 'week') {
+                        const weekNumber = Math.floor((date.getDate() - 1) / 7) + 1;
+                        key = `${date.getFullYear()}-W${weekNumber}`;
+                    } else if (chartTimeRange === 'quarter') {
+                        const quarter = Math.floor(date.getMonth() / 3) + 1;
+                        key = `${date.getFullYear()}-Q${quarter}`;
+                    }
+                    
+                    if (monthlyData.hasOwnProperty(key)) {
+                        monthlyData[key] += parseFloat(expense.amount || 0);
+                    }
+                });
+                
+                amounts = Object.values(monthlyData);
+            }
+            
+            // Destroy existing chart
+            if (expenseChart) {
+                expenseChart.destroy();
+            }
+            
+            // Create new chart
+            expenseChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Total Expenses (Rp)',
+                        data: amounts,
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Rp ${formatCurrency(context.raw)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'Rp ' + formatCurrency(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateStatusChart(expenses) {
+            const ctx = document.getElementById('statusChart').getContext('2d');
+            
+            // Count expenses by status
+            const statusCounts = {
+                'pending': 0,
+                'pending-main': 0,
+                'sub-approved': 0,
+                'approved': 0,
+                'paid': 0,
+                'rejected': 0
+            };
+            
+            expenses.forEach(expense => {
+                if (expense.paymentStatus === 'paid') {
+                    statusCounts['paid']++;
+                } else if (expense.status === 'rejected') {
+                    statusCounts['rejected']++;
+                } else if (expense.status in statusCounts) {
+                    statusCounts[expense.status]++;
+                }
+            });
+            
+            const labels = Object.keys(statusCounts).map(key => 
+                key.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())
+            );
+            
+            const data = Object.values(statusCounts);
+            const colors = [
+                '#fff3cd',  // pending
+                '#e67e22',  // pending-main
+                '#cce5ff',  // sub-approved
+                '#d4edda',  // approved
+                '#2ecc71',  // paid
+                '#f8d7da'   // rejected
+            ];
+            
+            const borderColors = [
+                '#856404',  // pending
+                '#a1580e',  // pending-main
+                '#004085',  // sub-approved
+                '#155724',  // approved
+                '#27ae60',  // paid
+                '#721c24'   // rejected
+            ];
+            
+            // Destroy existing chart
+            if (statusChart) {
+                statusChart.destroy();
+            }
+            
+            // Create new chart
+            statusChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderColor: borderColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function viewExpense(id) {
+            try {
+                const expense = allExpenses.find(item => item.id === id);
+                
+                if (expense) {
+                    let details = `Expense Details:\n\n` +
+                          `ID: ${expense.id}\n` +
+                          `Project: ${expense.project}\n` +
+                          `Employee: ${expense.name}\n` +
+                          `Division: ${expense.division}\n` +
+                          `Manager: ${expense.manager}\n` +
+                          `Amount: Rp ${formatCurrency(expense.amount)}\n` +
+                          `Type: ${expense.type === 'cash-advance' ? 'Cash Advance' : 'Reimbursement'}\n` +
+                          `Category: ${formatCategoryName(expense.category)}\n` +
+                          `Status: ${getStatusText(expense.status)}\n` +
+                          `Payment Status: ${expense.paymentStatus || 'Not paid'}\n` +
+                          `Urgency: ${expense.urgency || 'Normal'}\n` +
+                          `Submitted: ${formatDateTime(expense.submittedDate)}\n`;
+                    
+                    if (expense.subApprovedBy) {
+                        details += `Sub Approved by: ${expense.subApprovedBy} on ${expense.subApprovedDate}\n`;
+                    }
+                    if (expense.approvedBy) {
+                        details += `Approved by: ${expense.approvedBy} on ${expense.approvalDate}\n`;
+                    }
+                    if (expense.paymentDate) {
+                        details += `Payment Date: ${expense.paymentDate}\n`;
+                        details += `Payment Method: ${expense.paymentMethod}\n`;
+                        details += `Paid by: ${expense.paidBy}\n`;
+                    }
+                    if (expense.rejectionReason) {
+                        details += `Rejection Reason: ${expense.rejectionReason}\n`;
+                    }
+                    details += `Description: ${expense.description || 'No description'}`;
+                    
+                    alert(details);
+                } else {
+                    alert('Expense not found!');
+                }
+            } catch (error) {
+                console.error('Error viewing expense:', error);
+                alert('Error loading expense details.');
+            }
+        }
+
+        // ========== DEBUG & MAINTENANCE FUNCTIONS ==========
+
+        async function checkData() {
+            try {
+                const pending = allExpenses.filter(item => item.status === 'pending').length;
+                const pendingMain = allExpenses.filter(item => item.status === 'pending-main').length;
+                const subApproved = allExpenses.filter(item => item.status === 'sub-approved').length;
+                const approved = allExpenses.filter(item => item.status === 'approved').length;
+                const paid = allExpenses.filter(item => item.paymentStatus === 'paid').length;
+                const rejected = allExpenses.filter(item => item.status === 'rejected').length;
+                
+                const totalAmount = allExpenses.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+                const paidAmount = allExpenses
+                    .filter(item => item.paymentStatus === 'paid')
+                    .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+                
+                const directApprovalCount = allExpenses.filter(item => 
+                    item.manager === 'Achmad Oskar Wiriadidjaja' && item.status === 'pending-main'
+                ).length;
+                
+                alert(`📊 Dashboard Data Check:\n\n` +
+                      `Total Expenses: ${allExpenses.length}\n` +
+                      `Total Amount: Rp ${formatCurrency(totalAmount)}\n\n` +
+                      `Pending Sub-Approval: ${pending}\n` +
+                      `Pending Main Approval: ${pendingMain} (${directApprovalCount} direct to Achmad Oskar)\n` +
+                      `Sub Approved: ${subApproved}\n` +
+                      `Fully Approved: ${approved}\n` +
+                      `Paid: ${paid}\n` +
+                      `Rejected: ${rejected}\n\n` +
+                      `Total Paid Amount: Rp ${formatCurrency(paidAmount)}\n\n` +
+                      `✅ Data loaded from Airtable`);
+            } catch (error) {
+                alert('Error checking data: ' + error.message);
+            }
+        }
+
+        async function migrateToAirtable() {
+            if (confirm('Migrate all local data to Airtable?\n\nThis will upload all expenses from localStorage to Airtable.')) {
+                await window.airtableService.migrateLocalToAirtable();
+                loadDashboardData();
+            }
+        }
+
+        function clearData() {
+            if (confirm('⚠️ WARNING: Clear ALL local expense data?\n\nThis will delete ALL local expense submissions. Airtable data will remain.')) {
+                localStorage.removeItem('expenseSubmissions');
+                localStorage.removeItem('expenseDrafts');
+                loadDashboardData();
+                alert('✅ All local data cleared!');
+            }
+        }
+
+        function syncAllData() {
+            loadDashboardData();
+            alert('✅ Data synchronized with Airtable!');
+        }
+
+        async function repairData() {
+            try {
+                alert('Repair function would fix data inconsistencies.\n\nIn a real implementation, this would validate and fix Airtable data.');
+                // Implementation would depend on specific data issues
+            } catch (error) {
+                console.error('Error repairing data:', error);
+                alert('❌ Error repairing data. Please try again.');
+            }
+        }
+
+        // ========== UTILITY FUNCTIONS ==========
+
+        function formatCategoryName(category) {
+            const names = {
+                'travel': 'Travel & Accommodation',
+                'meals': 'Meals & Entertainment',
+                'office-supplies': 'Office Supplies',
+                'software': 'Software & Subscriptions',
+                'hardware': 'Hardware & Equipment',
+                'training': 'Training & Development',
+                'marketing': 'Marketing & Advertising',
+                'utilities': 'Utilities & Services',
+                'other': 'Other'
+            };
+            return names[category] || category;
+        }
+
+        function getStatusText(status) {
+            const statusMap = {
+                'pending': 'Pending Sub Approval',
+                'pending-main': 'Pending Main Approval',
+                'sub-approved': 'Sub Approved',
+                'approved': 'Approved',
+                'rejected': 'Rejected',
+                'paid': 'Paid'
+            };
+            return statusMap[status] || status;
+        }
+        
+        function formatDateTime(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleString('id-ID');
+            } catch (e) {
+                return dateString;
+            }
+        }
+
+        function formatCurrency(amount) {
+            return parseFloat(amount || 0).toLocaleString('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                return new Date(dateString).toLocaleDateString('id-ID');
+            } catch (e) {
+                return dateString;
+            }
+        }
+
+// ========== EXPORT TO EXCEL ==========
+function exportToExcel() {
+    try {
+        if (!allExpenses || allExpenses.length === 0) {
+            alert('No data to export!');
+            return;
+        }
+        
+        // Siapkan data untuk export (hanya yang tampil di recent expenses)
+        const exportData = allExpenses.map(expense => {
+            // Format approval dates
+            let subApprovalDate = expense.subApprovedDate ? formatDate(expense.subApprovedDate) : '-';
+            let finalApprovalDate = expense.approvalDate ? formatDate(expense.approvalDate) : '-';
+            let paymentDate = expense.paymentDate ? formatDate(expense.paymentDate) : '-';
+            
+            // Status text
+            let statusText = '';
+            if (expense.paymentStatus === 'paid') {
+                statusText = 'PAID';
+            } else if (expense.status === 'approved') {
+                statusText = 'APPROVED';
+            } else if (expense.status === 'sub-approved') {
+                statusText = 'SUB APPROVED';
+            } else if (expense.status === 'pending-main') {
+                statusText = 'PENDING MAIN';
+            } else if (expense.status === 'pending') {
+                statusText = 'PENDING';
+            } else if (expense.status === 'rejected') {
+                statusText = 'REJECTED';
+            } else {
+                statusText = expense.status || 'UNKNOWN';
+            }
+            
+            return {
+                'Date': formatDate(expense.date || expense.expenseDate),
+                'Employee': expense.name || expense.employeeName || '-',
+                'Division': expense.division || '-',
+                'Project': expense.project || '-',
+                'Description': expense.description || '-',
+                'Amount': expense.amount || 0,
+                'Category': formatCategoryName(expense.category),
+                'Manager': expense.manager || '-',
+                'Status': statusText,
+                'Sub Approval Date': subApprovalDate,
+                'Final Approval Date': finalApprovalDate,
+                'Payment Date': paymentDate,
+                'Payment Method': expense.paymentMethod || '-',
+                'Urgency': (expense.urgency || 'normal').toUpperCase(),
+                'Submitted': formatDate(expense.submittedDate)
+            };
+        });
+        
+        // Urutkan dari yang terbaru
+        exportData.sort((a, b) => new Date(b.Date) - new Date(a.Date));
+        
+        // Buat worksheet
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        
+        // Set column widths
+        const colWidths = [
+            { wch: 12 }, // Date
+            { wch: 15 }, // Employee
+            { wch: 12 }, // Division
+            { wch: 20 }, // Project
+            { wch: 30 }, // Description
+            { wch: 15 }, // Amount
+            { wch: 15 }, // Category
+            { wch: 20 }, // Manager
+            { wch: 12 }, // Status
+            { wch: 15 }, // Sub Approval Date
+            { wch: 15 }, // Final Approval Date
+            { wch: 12 }, // Payment Date
+            { wch: 15 }, // Payment Method
+            { wch: 10 }, // Urgency
+            { wch: 12 }  // Submitted
+        ];
+        ws['!cols'] = colWidths;
+        
+        // Tambahkan worksheet ke workbook
+        XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
+        
+        // Generate filename dengan tanggal
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0];
+        const filename = `Expense_Report_${dateStr}.xlsx`;
+        
+        // Download file
+        XLSX.writeFile(wb, filename);
+        
+        // Notifikasi sukses
+        alert(`✅ Exported ${exportData.length} expenses to Excel!\nFile: ${filename}`);
+        
+    } catch (error) {
+        console.error('Export error:', error);
+        alert('❌ Error exporting to Excel: ' + error.message);
+    }
+}
+
+// Helper function untuk format category (copy dari yang sudah ada)
+function formatCategoryName(category) {
+    const names = {
+        'travel': 'Travel',
+        'meals': 'Meals',
+        'office-supplies': 'Office Supplies',
+        'software': 'Software',
+        'hardware': 'Hardware',
+        'training': 'Training',
+        'marketing': 'Marketing',
+        'utilities': 'Utilities',
+        'other': 'Other'
+    };
+    return names[category] || category;
+}
+    </script>
+</body>
+</html>

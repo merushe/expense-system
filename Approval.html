@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Approval - Expense System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    
+    <!-- AIRTABLE API -->
+    <script src="api.js"></script>
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #2c3e50 0%, #1a2530 100%);
+            margin-bottom: 30px;
+        }
+        .page-header {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+            padding: 25px 0;
+            margin-bottom: 30px;
+            border-radius: 0 0 15px 15px;
+        }
+        .expense-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-left: 4px solid #f39c12;
+        }
+        .expense-card.sub-approved { border-left-color: #3498db; }
+        .expense-card.approved { border-left-color: #2ecc71; }
+        .expense-card.rejected { border-left-color: #e74c3c; }
+        .expense-card.paid { border-left-color: #9b59b6; }
+        .expense-card.pending-main { border-left-color: #e67e22; }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-sub-approved { background: #cce5ff; color: #004085; }
+        .badge-approved { background: #d4edda; color: #155724; }
+        .badge-rejected { background: #f8d7da; color: #721c24; }
+        .badge-paid { background: #d1ecf1; color: #0c5460; }
+        .badge-pending-main { background: #e67e22; color: white; }
+        .btn-sub-approve { background: #3498db; color: white; }
+        .btn-approve { background: #2ecc71; color: white; }
+        .btn-reject { background: #e74c3c; color: white; }
+        .approval-flow {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .approval-flow .step {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-right: 5px;
+            background: #eee;
+        }
+        .approval-flow .step.active {
+            background: #f39c12;
+            color: white;
+        }
+        .approval-flow .step.completed {
+            background: #2ecc71;
+            color: white;
+        }
+        .expense-card.pending-main { border-left-color: #e67e22; }
+        .connection-banner {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-radius: 0 0 10px 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Connection Banner -->
+    <div class="connection-banner alert alert-warning mb-0 text-center py-2" id="connectionBanner" style="display: none;">
+        <i class="bi bi-wifi-off"></i> Working offline - Changes saved locally
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="Dashboard.html">
+                <i class="bi bi-wallet2"></i> Expense System
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="Dashboard.html"><i class="bi bi-house-door"></i> Dashboard</a>
+                <a class="nav-link" href="Form.html"><i class="bi bi-plus-circle"></i> Submit</a>
+                <a class="nav-link active" href="Approval.html"><i class="bi bi-check-circle"></i> Approve</a>
+                <a class="nav-link" href="Payment.html"><i class="bi bi-credit-card"></i> Pay</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-2"><i class="bi bi-check-circle"></i> Approval System</h1>
+                    <p class="mb-0">Two-tier approval: Sub Approval → Main Approval → Payment</p>
+                </div>
+                <div class="text-end">
+                    <small id="approvalStatus">Loading...</small>
+                    <div class="small" id="dataSourceInfo">From Airtable</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Role Selection -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title">Select Your Role</h5>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-primary active" onclick="setRole('sub-approval')">
+                                Sub Approval (Muhammad Salman, Mohammad Rizki or Laras Setyowinanti)
+                            </button>
+                            <button type="button" class="btn btn-outline-success" onclick="setRole('main-approval')">
+                                Main Approval (Achmad Oskar Wiriadidjaja)
+                            </button>
+                            <button type="button" class="btn btn-outline-info" onclick="setRole('payment')">
+                                Payment (Financing)
+                            </button>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">Current role: <span id="currentRole">Sub Approval</span></small>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="badge" id="syncBadge">Syncing...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title" id="pendingCount">0</h5>
+                        <p class="card-text text-muted">Pending My Action</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title" id="subApprovedCount">0</h5>
+                        <p class="card-text text-muted">Sub Approved</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title" id="approvedCount">0</h5>
+                        <p class="card-text text-muted">Fully Approved</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title" id="urgentCount">0</h5>
+                        <p class="card-text text-muted">Urgent Items</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <a class="nav-link active" href="#" onclick="showTab('pending')">Pending My Action</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showTab('sub-approved')">Sub Approved</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showTab('approved')">Fully Approved</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showTab('rejected')">Rejected</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showTab('paid')">Paid</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showTab('all')">All</a>
+            </li>
+        </ul>
+
+        <!-- Expense List -->
+        <div id="pendingTab" class="tab-content">
+            <h4 class="mb-3">Pending My Action</h4>
+            <div id="pendingList"></div>
+            <div id="noPending" class="text-center py-5" style="display: none;">
+                <i class="bi bi-check-circle display-4 text-muted mb-3"></i>
+                <h5>No pending approvals</h5>
+                <p class="text-muted">All expenses have been reviewed</p>
+            </div>
+        </div>
+
+        <div id="subApprovedTab" class="tab-content" style="display: none;">
+            <h4 class="mb-3">Sub Approved Expenses</h4>
+            <div id="subApprovedList"></div>
+        </div>
+
+        <div id="approvedTab" class="tab-content" style="display: none;">
+            <h4 class="mb-3">Fully Approved Expenses (Ready for Payment)</h4>
+            <div id="approvedList"></div>
+        </div>
+
+        <div id="rejectedTab" class="tab-content" style="display: none;">
+            <h4 class="mb-3">Rejected Expenses</h4>
+            <div id="rejectedList"></div>
+        </div>
+
+        <div id="paidTab" class="tab-content" style="display: none;">
+            <h4 class="mb-3">Paid Expenses</h4>
+            <div id="paidList"></div>
+        </div>
+
+        <div id="allTab" class="tab-content" style="display: none;">
+            <h4 class="mb-3">All Expenses</h4>
+            <div id="allList"></div>
+        </div>
+
+        <!-- Debug -->
+        <div class="mt-4">
+            <button class="btn btn-sm btn-outline-secondary" onclick="refreshData()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh Data
+            </button>
+            <button class="btn btn-sm btn-outline-info" onclick="checkData()">
+                <i class="bi bi-database"></i> Check Data
+            </button>
+            <button class="btn btn-sm btn-outline-warning" onclick="testConnection()">
+                <i class="bi bi-wifi"></i> Test Connection
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+<script src="sync-manager.js"></script>
+<script>
+// OVERRIDE FUNGSI - VERSI FINAL UNTUK APPROVAL.HTML
+
+// Simpan fungsi asli
+const originalLoadExpenses = window.loadExpenses;
+const originalUpdateExpenseStatus = window.updateExpenseStatus;
+const originalUpdatePaymentStatus = window.updatePaymentStatus;
+
+// Variable global dari script bawah - akses langsung
+// Tidak perlu dideklarasikan ulang
+
+// Override loadExpenses
+window.loadExpenses = async function() {
+    try {
+        console.log('Loading consolidated data...');
+        
+        if (window.airtableService && window.airtableService.getConsolidatedData) {
+            allExpenses = await window.airtableService.getConsolidatedData();
+            console.log(`Loaded ${allExpenses.length} consolidated expenses`);
+            
+            // Hitung ulang statistics berdasarkan currentRole
+            let pendingForMe = 0;
+            if (currentRole === 'sub-approval') {
+                pendingForMe = allExpenses.filter(item => 
+                    item.status === 'pending' && 
+                    subApprovers.includes(item.manager)
+                ).length;
+            } else if (currentRole === 'main-approval') {
+                pendingForMe = allExpenses.filter(item => 
+                    item.status === 'sub-approved' || item.status === 'pending-main'
+                ).length;
+            } else if (currentRole === 'payment') {
+                pendingForMe = allExpenses.filter(item => 
+                    item.status === 'approved' && 
+                    item.paymentStatus !== 'paid'
+                ).length;
+            }
+            
+            // Update statistics
+            document.getElementById('pendingCount').textContent = pendingForMe;
+            document.getElementById('subApprovedCount').textContent = 
+                allExpenses.filter(item => item.status === 'sub-approved').length;
+            document.getElementById('approvedCount').textContent = 
+                allExpenses.filter(item => item.status === 'approved').length;
+            document.getElementById('urgentCount').textContent = 
+                allExpenses.filter(item => item.urgency === 'critical').length;
+            
+            // Render tab
+            if (typeof renderTab === 'function') {
+                renderTab(currentTab);
+            }
+            
+            // Update connection status
+            if (window.SyncManager) {
+                const status = window.SyncManager.getConnectionStatus();
+                const syncBadge = document.getElementById('syncBadge');
+                const dataSourceInfo = document.getElementById('dataSourceInfo');
+                const connectionBanner = document.getElementById('connectionBanner');
+                
+                if (syncBadge) {
+                    syncBadge.className = status.isOnline ? 'badge bg-success' : 'badge bg-danger';
+                    syncBadge.textContent = status.isOnline ? 'Online' : 'Offline';
+                }
+                if (dataSourceInfo) {
+                    dataSourceInfo.textContent = status.isOnline ? 
+                        `From Airtable (${allExpenses.length} records)` : 'From Local Storage';
+                }
+                if (connectionBanner) {
+                    connectionBanner.style.display = status.isOnline ? 'none' : 'block';
+                }
+            }
+            
+        } else {
+            if (originalLoadExpenses) await originalLoadExpenses();
+        }
+    } catch (error) {
+        console.error('Error loading consolidated data:', error);
+        if (originalLoadExpenses) await originalLoadExpenses();
+    }
+};
+
+// Override updateExpenseStatus
+window.updateExpenseStatus = async function(expenseId, status, reason = '', approvalLevel = '') {
+    try {
+        const expense = allExpenses.find(item => item.id === expenseId);
+        if (!expense) {
+            alert('Expense not found!');
+            return;
+        }
+        
+        const updateData = {
+            status: status,
+            // Gunakan format YYYY-MM-DD untuk lastUpdated
+            lastUpdated: new Date().toISOString().split('T')[0]
+        };
+        
+        window._updatingExpense = true;
+        
+        if (status === 'sub-approved') {
+            updateData.subApprovedDate = new Date().toISOString().split('T')[0];
+            updateData.subApprovedBy = currentRole === 'sub-approval' ? expense.manager : 'Unknown';
+        } else if (status === 'approved') {
+            updateData.approvalDate = new Date().toISOString().split('T')[0];
+            updateData.approvedBy = mainApprover;
+        } else if (status === 'rejected') {
+            updateData.rejectionReason = reason;
+            updateData.rejectedBy = approvalLevel;
+        }
+        
+        let result = { success: false };
+        
+        if (window.airtableService && window.SyncManager && window.SyncManager.isOnline) {
+            result = await window.airtableService.updateExpense(expense.airtableId || expenseId, updateData);
+        }
+        
+        // Update localStorage
+        try {
+            const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
+            const index = localData.findIndex(item => 
+                item.airtableId === expense.airtableId || item.id === expenseId
+            );
+            if (index >= 0) {
+                localData[index] = { ...localData[index], ...updateData };
+                localStorage.setItem('expenseSubmissions', JSON.stringify(localData));
+            }
+        } catch (e) {}
+        
+        window._updatingExpense = false;
+        
+        if (result.success || !window.SyncManager?.isOnline) {
+            alert(`✅ Expense ${status.replace('-', ' ')} successfully!`);
+            loadExpenses();
+        } else {
+            alert(`⚠️ Updated locally. Will sync when online.`);
+            loadExpenses();
+        }
+        
+    } catch (error) {
+        console.error('Error updating expense:', error);
+        window._updatingExpense = false;
+        alert('Error updating expense status.');
+    }
+};
+
+// Override updatePaymentStatus
+window.updatePaymentStatus = async function(expenseId, paymentDate, paymentMethod, paidBy) {
+    try {
+        const expense = allExpenses.find(item => item.id === expenseId);
+        if (!expense) {
+            alert('Expense not found!');
+            return;
+        }
+        
+        const updateData = {
+            paymentStatus: 'paid',
+            paymentDate: paymentDate,
+            paymentMethod: paymentMethod,
+            paidBy: paidBy,
+            status: 'paid',
+            lastUpdated: new Date().toISOString()
+        };
+        
+        window._updatingPayment = true;
+        
+        let result = { success: false };
+        
+        if (window.airtableService && window.SyncManager && window.SyncManager.isOnline) {
+            result = await window.airtableService.updateExpense(expense.airtableId || expenseId, updateData);
+        }
+        
+        // Update localStorage
+        try {
+            const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
+            const index = localData.findIndex(item => 
+                item.airtableId === expense.airtableId || item.id === expenseId
+            );
+            if (index >= 0) {
+                localData[index] = { ...localData[index], ...updateData };
+                localStorage.setItem('expenseSubmissions', JSON.stringify(localData));
+            }
+        } catch (e) {}
+        
+        window._updatingPayment = false;
+        
+        if (result.success || !window.SyncManager?.isOnline) {
+            alert('✅ Payment recorded successfully!');
+            loadExpenses();
+        } else {
+            alert(`⚠️ Payment recorded locally. Will sync when online.`);
+            loadExpenses();
+        }
+        
+    } catch (error) {
+        console.error('Error updating payment:', error);
+        window._updatingPayment = false;
+        alert('Error recording payment.');
+    }
+};
+
+// Fungsi manual sync
+function manualSync() {
+    if (window.SyncManager) {
+        window.SyncManager.manualSync();
+    } else {
+        alert('Sync Manager not available');
+    }
+}
+</script>
+
+<script>
+        let allExpenses = [];
+        let currentTab = 'pending';
+        let currentRole = 'sub-approval'; // 'sub-approval', 'main-approval', 'payment'
+        const mainApprover = 'Achmad Oskar Wiriadidjaja';
+        const subApprovers = ['Muhammad Salman', 'Mohammad Rizki', 'Laras Setyowinanti'];
+        let isOnline = false;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Approval page loaded - Airtable Version');
+               
+    // Cek URL parameter untuk role
+    const urlParams = new URLSearchParams(window.location.search);
+    const roleParam = urlParams.get('role');
+    
+    if (roleParam === 'main-approval') {
+        setRole('main-approval');
+        // Update active button
+        document.querySelectorAll('.btn-group .btn')[1].classList.add('active');
+        document.querySelectorAll('.btn-group .btn')[0].classList.remove('active');
+    } else if (roleParam === 'sub-approval') {
+        setRole('sub-approval');
+        
+// sub-approval sudah default active
+    }
+            // Update navigation active state
+            const currentPage = window.location.pathname.split('/').pop();
+            document.querySelectorAll('.nav-link').forEach(link => {
+                if (link.getAttribute('href') === currentPage) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+
+            // Test connection first
+            testConnection();
+            
+            // Load expenses
+            loadExpenses();
+            
+            // Auto-refresh every 10 seconds
+            setInterval(loadExpenses, 10000);
+        });
+
+        async function testConnection() {
+            try {
+                document.getElementById('syncBadge').className = 'badge bg-warning';
+                document.getElementById('syncBadge').textContent = 'Testing...';
+                
+                const testData = await window.airtableService.getAllExpenses();
+                isOnline = true;
+                
+                document.getElementById('syncBadge').className = 'badge bg-success';
+                document.getElementById('syncBadge').textContent = 'Online';
+                document.getElementById('dataSourceInfo').textContent = `From Airtable (${testData.length} records)`;
+                
+                document.getElementById('connectionBanner').style.display = 'none';
+                
+                return true;
+            } catch (error) {
+                isOnline = false;
+                
+                document.getElementById('syncBadge').className = 'badge bg-danger';
+                document.getElementById('syncBadge').textContent = 'Offline';
+                document.getElementById('dataSourceInfo').textContent = 'From Local Storage';
+                
+                document.getElementById('connectionBanner').style.display = 'block';
+                
+                return false;
+            }
+        }
+
+        function setRole(role) {
+            currentRole = role;
+            document.querySelectorAll('.btn-group .btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            const roleNames = {
+                'sub-approval': 'Sub Approval (Muhammad Salman, Mohammad Rizki or Laras Setyowinanti)',
+                'main-approval': 'Main Approval (Achmad Oskar Wiriadidjaja)',
+                'payment': 'Payment (Financing)'
+            };
+            
+            document.getElementById('currentRole').textContent = roleNames[role];
+            document.getElementById('approvalStatus').textContent = `Role: ${roleNames[role]}`;
+            
+            loadExpenses();
+            renderTab(currentTab);
+        }
+
+        async function loadExpenses() {
+            try {
+                console.log('Loading expenses from Airtable...');
+                
+                allExpenses = await window.airtableService.getAllExpenses();
+                console.log(`Loaded ${allExpenses.length} expenses`);
+                
+                // Update statistics based on current role
+                let pendingForMe = 0;
+                const subApproved = allExpenses.filter(item => item.status === 'sub-approved').length;
+                const approved = allExpenses.filter(item => item.status === 'approved').length;
+                const pendingMain = allExpenses.filter(item => item.status === 'pending-main').length;
+                const urgent = allExpenses.filter(item => 
+                    (item.status === 'pending' || item.status === 'pending-main' || item.status === 'sub-approved') && 
+                    item.urgency === 'critical'
+                ).length;
+                
+                // Calculate pending for current role
+                if (currentRole === 'sub-approval') {
+                    pendingForMe = allExpenses.filter(item => 
+                        item.status === 'pending' && 
+                        subApprovers.includes(item.manager)
+                    ).length;
+                } else if (currentRole === 'main-approval') {
+                    pendingForMe = allExpenses.filter(item => 
+                        item.status === 'sub-approved' || item.status === 'pending-main'
+                    ).length;
+                } else if (currentRole === 'payment') {
+                    pendingForMe = allExpenses.filter(item => 
+                        item.status === 'approved' && 
+                        item.paymentStatus !== 'paid'
+                    ).length;
+                }
+                
+                document.getElementById('pendingCount').textContent = pendingForMe;
+                document.getElementById('subApprovedCount').textContent = subApproved;
+                document.getElementById('approvedCount').textContent = approved;
+                document.getElementById('urgentCount').textContent = urgent;
+                
+                // Render current tab
+                renderTab(currentTab);
+                
+            } catch (error) {
+                console.error('Error loading expenses:', error);
+                alert('Error loading expenses. Using local data.');
+            }
+        }
+
+        function renderTab(tabName) {
+            let filteredExpenses = [];
+            
+            switch(tabName) {
+                case 'pending':
+                    if (currentRole === 'sub-approval') {
+                        filteredExpenses = allExpenses.filter(item => 
+                            item.status === 'pending' && 
+                            subApprovers.includes(item.manager)
+                        );
+                    } else if (currentRole === 'main-approval') {
+                        filteredExpenses = allExpenses.filter(item => 
+                            item.status === 'sub-approved' || item.status === 'pending-main'
+                        );
+                    } else if (currentRole === 'payment') {
+                        filteredExpenses = allExpenses.filter(item => 
+                            item.status === 'approved' && 
+                            item.paymentStatus !== 'paid'
+                        );
+                    }
+                    break;
+                case 'sub-approved':
+                    filteredExpenses = allExpenses.filter(item => item.status === 'sub-approved');
+                    break;
+                case 'approved':
+                    filteredExpenses = allExpenses.filter(item => item.status === 'approved');
+                    break;
+                case 'rejected':
+                    filteredExpenses = allExpenses.filter(item => item.status === 'rejected');
+                    break;
+                case 'paid':
+                    filteredExpenses = allExpenses.filter(item => item.paymentStatus === 'paid');
+                    break;
+                case 'all':
+                    filteredExpenses = allExpenses;
+                    break;
+            }
+            
+            const container = document.getElementById(tabName === 'sub-approved' ? 'subApprovedList' : tabName + 'List');
+            
+            if (filteredExpenses.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox display-4 text-muted mb-3"></i>
+                        <h5>No expenses found</h5>
+                        <p class="text-muted">No expenses match this category</p>
+                    </div>
+                `;
+                
+                if (tabName === 'pending') {
+                    document.getElementById('noPending').style.display = 'block';
+                }
+                return;
+            }
+            
+            if (tabName === 'pending') {
+                document.getElementById('noPending').style.display = 'none';
+            }
+            
+            let html = '';
+            filteredExpenses.forEach(expense => {
+                const statusBadge = getStatusBadge(expense.status, expense.paymentStatus);
+                const actions = getActionButtons(expense);
+                const approvalFlow = getApprovalFlow(expense);
+                
+                // Tentukan jenis approval flow
+                let approvalType = "2-Step Approval";
+                if (expense.manager === mainApprover && expense.status === 'pending-main') {
+                    approvalType = "Direct to Main Approval";
+                }
+                
+                html += `
+                    <div class="expense-card ${expense.status}">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h5>${expense.project}</h5>
+                                <p class="mb-1">${expense.name} • ${expense.division} • ${formatDate(expense.date)}</p>
+                                <p class="text-muted mb-2">${expense.description || ''}</p>
+                                <div class="approval-flow">${approvalFlow}</div>
+                                <p class="mb-0">
+                                    <small class="text-muted">
+                                        <span class="badge bg-info">${approvalType}</span>
+                                        Manager: ${expense.manager} • 
+                                        Type: ${expense.type === 'cash-advance' ? 'Cash Advance' : 'Reimbursement'}
+                                        ${expense.subApprovedBy ? ` • Sub Approved by: ${expense.subApprovedBy}` : ''}
+                                        ${expense.approvedBy ? ` • Approved by: ${expense.approvedBy}` : ''}
+                                        ${expense.paidBy ? ` • Paid by: ${expense.paidBy}` : ''}
+                                        ${expense.hasAttachment ? ' • <i class="bi bi-paperclip"></i> Bukti Tersedia' : ''}
+                                    </small>
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <h4 class="text-primary">Rp ${formatCurrency(expense.amount)}</h4>
+                                <div class="mb-2">${statusBadge}</div>
+                                ${expense.urgency === 'critical' ? '<span class="badge bg-danger">URGENT</span>' : ''}
+                                ${actions}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function getApprovalFlow(expense) {
+            let steps = [];
+            let currentStep = 0;
+            
+            if (expense.manager === mainApprover && expense.status === 'pending-main') {
+                // Direct approval flow
+                steps = ['Request', 'Main Approval', 'Payment'];
+                if (expense.status === 'pending-main') currentStep = 1;
+                else if (expense.status === 'approved') currentStep = 2;
+                else if (expense.paymentStatus === 'paid') currentStep = 3;
+            } else {
+                // Normal 2-step flow
+                steps = ['Request', 'Sub Approval', 'Main Approval', 'Payment'];
+                if (expense.status === 'pending') currentStep = 1;
+                else if (expense.status === 'sub-approved') currentStep = 2;
+                else if (expense.status === 'approved') currentStep = 3;
+                else if (expense.paymentStatus === 'paid') currentStep = 4;
+            }
+            
+            let html = '';
+            for (let i = 0; i < steps.length; i++) {
+                let stepClass = '';
+                if (i < currentStep) stepClass = 'completed';
+                else if (i === currentStep) stepClass = 'active';
+                
+                html += `<span class="step ${stepClass}">${steps[i]}</span>`;
+            }
+            return html;
+        }
+
+        function getStatusBadge(status, paymentStatus) {
+            if (paymentStatus === 'paid') {
+                return '<span class="status-badge badge-paid">Paid</span>';
+            }
+            
+            switch(status) {
+                case 'pending': return '<span class="status-badge badge-pending">Pending Sub Approval</span>';
+                case 'pending-main': return '<span class="status-badge badge-pending" style="background:#e67e22;color:white;">Pending Main Approval</span>';
+                case 'sub-approved': return '<span class="status-badge badge-sub-approved">Sub Approved</span>';
+                case 'approved': return '<span class="status-badge badge-approved">Approved (Ready for Payment)</span>';
+                case 'rejected': return '<span class="status-badge badge-rejected">Rejected</span>';
+                default: return '<span class="badge bg-secondary">Unknown</span>';
+            }
+        }
+
+        function getActionButtons(expense) {
+            let buttons = '';
+            
+            if (currentRole === 'sub-approval' && expense.status === 'pending' && subApprovers.includes(expense.manager)) {
+                buttons = `
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-sub-approve me-2" onclick="subApproveExpense('${expense.id}')">
+                            <i class="bi bi-check"></i> Sub Approve
+                        </button>
+                        <button class="btn btn-sm btn-reject" onclick="rejectExpense('${expense.id}')">
+                            <i class="bi bi-x"></i> Reject
+                        </button>
+                    </div>
+                `;
+            } else if (currentRole === 'main-approval' && (expense.status === 'sub-approved' || expense.status === 'pending-main')) {
+                buttons = `
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-approve me-2" onclick="mainApproveExpense('${expense.id}')">
+                            <i class="bi bi-check-circle"></i> ${expense.status === 'pending-main' ? 'Direct Approve' : 'Final Approve'}
+                        </button>
+                        <button class="btn btn-sm btn-reject" onclick="rejectExpense('${expense.id}')">
+                            <i class="bi bi-x-circle"></i> Reject
+                        </button>
+                    </div>
+                `;
+            } else if (currentRole === 'payment' && expense.status === 'approved' && expense.paymentStatus !== 'paid') {
+                buttons = `
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-success" onclick="markAsPaid('${expense.id}')">
+                            <i class="bi bi-credit-card"></i> Mark as Paid
+                        </button>
+                    </div>
+                `;
+            } else {
+                buttons = `
+                    <button class="btn btn-sm btn-outline-secondary mt-2" onclick="viewExpense('${expense.id}')">
+                        <i class="bi bi-eye"></i> View Details
+                    </button>
+                `;
+            }
+            
+            return buttons;
+        }
+
+        async function subApproveExpense(expenseId) {
+            if (confirm('Approve this expense at sub-approval level?')) {
+                await updateExpenseStatus(expenseId, 'sub-approved', '', 'Sub Approval');
+            }
+        }
+
+        async function mainApproveExpense(expenseId) {
+            if (confirm('Give final approval for this expense?')) {
+                await updateExpenseStatus(expenseId, 'approved', '', 'Main Approval');
+            }
+        }
+
+        async function rejectExpense(expenseId) {
+            const reason = prompt('Please enter reason for rejection:');
+            if (reason !== null) {
+                await updateExpenseStatus(expenseId, 'rejected', reason, currentRole === 'sub-approval' ? 'Sub Approval' : 'Main Approval');
+            }
+        }
+
+        async function markAsPaid(expenseId) {
+            const expense = allExpenses.find(item => item.id === expenseId);
+            if (!expense) {
+                alert('Expense not found!');
+                return;
+            }
+            
+            if (confirm(`Mark expense as paid?\n\nProject: ${expense.project}\nAmount: Rp ${formatCurrency(expense.amount)}`)) {
+                const paymentDate = prompt('Enter payment date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+                const paymentMethod = prompt('Enter payment method:', expense.paymentMethod || 'Bank Transfer');
+                const paidBy = prompt('Enter processor name:', 'Financing Department');
+                
+                if (paymentDate && paymentMethod && paidBy) {
+                    await updatePaymentStatus(expenseId, paymentDate, paymentMethod, paidBy);
+                }
+            }
+        }
+
+async function updateExpenseStatus(expenseId, status, reason = '', approvalLevel = '') {
+    try {
+        const expense = allExpenses.find(item => item.id === expenseId);
+        if (!expense) {
+            alert('Expense not found!');
+            return;
+        }
+        
+        const updateData = {
+            status: status,
+            // Gunakan format YYYY-MM-DD
+            lastUpdated: new Date().toISOString().split('T')[0]
+        };
+        
+        if (status === 'sub-approved') {
+            updateData.subApprovedDate = new Date().toISOString().split('T')[0];
+            updateData.subApprovedBy = currentRole === 'sub-approval' ? expense.manager : 'Unknown';
+        } else if (status === 'approved') {
+            updateData.approvalDate = new Date().toISOString().split('T')[0];
+            updateData.approvedBy = mainApprover;
+        } else if (status === 'rejected') {
+            updateData.rejectionReason = reason;
+            updateData.rejectedBy = approvalLevel;
+        }
+              
+                // Update in Airtable
+                const result = await window.airtableService.updateExpense(expenseId, updateData);
+                
+                if (result.success) {
+                    alert(`✅ Expense ${status.replace('-', ' ')} successfully!`);
+                    loadExpenses();
+                } else {
+                    alert(`⚠️ Updated locally. Airtable error: ${result.error}`);
+                    loadExpenses();
+                }
+                
+            } catch (error) {
+                console.error('Error updating expense:', error);
+                alert('Error updating expense status.');
+            }
+        }
+
+        async function updatePaymentStatus(expenseId, paymentDate, paymentMethod, paidBy) {
+            try {
+                const updateData = {
+                    paymentStatus: 'paid',
+                    paymentDate: paymentDate,
+                    paymentMethod: paymentMethod,
+                    paidBy: paidBy,
+                    status: 'paid',
+                    lastUpdated: new Date().toISOString()
+                };
+                
+                // Update in Airtable
+                const result = await window.airtableService.updateExpense(expenseId, updateData);
+                
+                if (result.success) {
+                    alert('✅ Payment recorded successfully!\n\nExpense marked as PAID.');
+                    loadExpenses();
+                } else {
+                    alert(`⚠️ Payment recorded locally. Airtable error: ${result.error}`);
+                    loadExpenses();
+                }
+                
+            } catch (error) {
+                console.error('Error updating payment:', error);
+                alert('Error recording payment.');
+            }
+        }
+
+        function viewExpense(expenseId) {
+            const expense = allExpenses.find(item => item.id === expenseId);
+            if (expense) {
+                let details = `Expense Details:\n\n` +
+                      `ID: ${expense.id}\n` +
+                      `Project: ${expense.project}\n` +
+                      `Employee: ${expense.name}\n` +
+                      `Division: ${expense.division}\n` +
+                      `Amount: Rp ${formatCurrency(expense.amount)}\n` +
+                      `Status: ${expense.status}\n` +
+                      `Payment Status: ${expense.paymentStatus || 'Not paid'}\n` +
+                      `Manager: ${expense.manager}\n`;
+                
+                if (expense.subApprovedBy) {
+                    details += `Sub Approved by: ${expense.subApprovedBy} on ${expense.subApprovedDate}\n`;
+                }
+                if (expense.approvedBy) {
+                    details += `Approved by: ${expense.approvedBy} on ${expense.approvalDate}\n`;
+                }
+                if (expense.rejectionReason) {
+                    details += `Rejection Reason: ${expense.rejectionReason}\n`;
+                }
+                details += `Description: ${expense.description || 'No description'}`;
+                
+                alert(details);
+            }
+        }
+
+        async function refreshData() {
+            await loadExpenses();
+            alert('Data refreshed!');
+        }
+
+        function showTab(tabName) {
+            currentTab = tabName;
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').style.display = 'block';
+            
+            // Update nav links active state
+            document.querySelectorAll('.nav-tabs .nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            renderTab(tabName);
+        }
+
+        function checkData() {
+            const pending = allExpenses.filter(item => item.status === 'pending').length;
+            const pendingMain = allExpenses.filter(item => item.status === 'pending-main').length;
+            const subApproved = allExpenses.filter(item => item.status === 'sub-approved').length;
+            const approved = allExpenses.filter(item => item.status === 'approved').length;
+            const paid = allExpenses.filter(item => item.paymentStatus === 'paid').length;
+            const rejected = allExpenses.filter(item => item.status === 'rejected').length;
+            
+            alert(`Approval System Data:\n\n` +
+                  `Total Expenses: ${allExpenses.length}\n` +
+                  `Pending Sub Approval: ${pending}\n` +
+                  `Pending Main Approval: ${pendingMain}\n` +
+                  `Sub Approved: ${subApproved}\n` +
+                  `Fully Approved: ${approved}\n` +
+                  `Paid: ${paid}\n` +
+                  `Rejected: ${rejected}\n\n` +
+                  `Connection: ${isOnline ? 'Online (Airtable)' : 'Offline (Local)'}`);
+        }
+
+        function formatCurrency(amount) {
+            return parseFloat(amount || 0).toLocaleString('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                return new Date(dateString).toLocaleDateString('id-ID');
+            } catch (e) {
+                return dateString;
+            }
+        }
+    </script>
+</body>
+</html>
