@@ -1,6 +1,4 @@
-# netlify.toml - Konfigurasi akses berdasarkan role
-
-# ATURAN PUBLIC (WAJIB PALING ATAS)
+# netlify.toml - VERSION TANPA PROTEKSI (untuk testing)
 [[redirects]]
   from = "/"
   to = "/index.html"
@@ -8,61 +6,7 @@
   force = true
 
 [[redirects]]
-  from = "/index.html"
+  from = "/*"
   to = "/index.html"
   status = 200
-  force = true
-
-[[redirects]]
-  from = "/api.js"
-  to = "/api.js"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/404.html"
-  to = "/404.html"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/403.html"
-  to = "/403.html"
-  status = 200
-  force = true
-
-# ATURAN PROTECTED (hanya dengan role tertentu)
-[[redirects]]
-  from = "/dashboard.html"
-  to = "/dashboard.html"
-  status = 200
-  force = true
-  conditions = {Role = ["admin", "finance"]}
-
-[[redirects]]
-  from = "/approval.html"
-  to = "/approval.html"
-  status = 200
-  force = true
-  conditions = {Role = ["admin", "approver"]}
-
-[[redirects]]
-  from = "/payment.html"
-  to = "/payment.html"
-  status = 200
-  force = true
-  conditions = {Role = ["admin", "finance"]}
-
-[[redirects]]
-  from = "/form.html"
-  to = "/form.html"
-  status = 200
-  force = true
-  conditions = {Role = ["admin", "employee"]}
-
-# SEMUA HALAMAN LAIN (termasuk yang salah ketik) akan kena 403
-[[redirects]]
-  from = "/*"
-  to = "/403.html"
-  status = 403
   force = true
