@@ -1,11 +1,26 @@
 // api.js - VERSI FINAL DENGAN SYNTAX YANG BENAR
+const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
+const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+
+// === DEBUGGING ENV VARIABLES ===
+console.log('=== AIRTABLE DEBUG ===');
+console.log('1. Token exists:', !!AIRTABLE_TOKEN);
+console.log('2. Token length:', AIRTABLE_TOKEN ? AIRTABLE_TOKEN.length : 0);
+console.log('3. Token first 10 chars:', AIRTABLE_TOKEN ? AIRTABLE_TOKEN.substring(0, 10) + '...' : 'undefined');
+console.log('4. Base ID:', AIRTABLE_BASE_ID);
+console.log('5. Node env:', process.env.NODE_ENV);
+console.log('========================');
+
+// Definisikan AIRTABLE_CONFIG
 const AIRTABLE_CONFIG = {
-    BASE_ID: 'appjHErOXIS0GwCDP',
-    TABLE_NAME: 'Expenses',
-    API_KEY: 'patxxxxxxxxxx'
+    API_KEY: AIRTABLE_TOKEN,
+    BASE_ID: AIRTABLE_BASE_ID,
+    TABLE_NAME: 'Expenses'  // Pastikan nama tabel sesuai
 };
 
 console.log('🔧 Airtable Config Loaded');
+console.log('Config API Key exists:', !!AIRTABLE_CONFIG.API_KEY);
+console.log('Config Base ID:', AIRTABLE_CONFIG.BASE_ID);
 
 window.airtableService = {
     // Test koneksi ke Airtable
