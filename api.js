@@ -21,26 +21,30 @@ window.airtableService = {
     },
 
     // Ambil semua expenses
-    getAllExpenses: async function() {
-        try {
-            console.log('Fetching from API...');
-            const response = await fetch(API_BASE_URL);
-            
-            if (response.ok) {
-                const data = await response.json();
-                console.log(`✅ Got ${data.length} records`);
-                return data;
-            } else {
-                console.error('❌ Failed to fetch:', response.status);
-                return [];
-            }
-        } catch (error) {
-            console.error('❌ Error fetching:', error);
+getAllExpenses: async function() {
+    try {
+        console.log('Fetching from API:', API_BASE_URL);
+        const response = await fetch(API_BASE_URL);
+        
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        console.log('Response data type:', Array.isArray(data) ? 'array' : typeof data);
+        console.log('Response data:', data);
+        
+        if (Array.isArray(data)) {
+            console.log(`✅ Got ${data.length} records`);
+            return data;
+        } else {
+            console.error('❌ Data is not array:', data);
             return [];
         }
-    },
-
-    // Buat expense baru
+    } catch (error) {
+        console.error('❌ Error fetching:', error);
+        return [];
+    }
+},
+    
+// Buat expense baru
     createExpense: async function(expenseData) {
         try {
             console.log('Creating expense:', expenseData);

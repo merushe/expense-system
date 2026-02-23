@@ -203,8 +203,8 @@ getConnectionStatus: function() {
 },
 
 // Inisialisasi
-try {
+if (window.SyncManager) {
     window.SyncManager.init();
-} catch (error) {
-    console.error('Failed to initialize SyncManager:', error);
+} else {
+    console.log('SyncManager not ready yet');
 }

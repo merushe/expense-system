@@ -4,40 +4,39 @@ export async function onRequest(context) {
   
   console.log('🎯 Cloudflare Function called');
   
-  // CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
   };
 
-  // Handle OPTIONS request
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers });
   }
 
-  // Hanya handle GET
   if (request.method === 'GET') {
     try {
-      const AIRTABLE_TOKEN = env.AIRTABLE_TOKEN;
-      const AIRTABLE_BASE_ID = env.AIRTABLE_BASE_ID;
+      const token = env.AIRTABLE_TOKEN;
+      const baseId = env.AIRTABLE_BASE_ID;
       
-      if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) {
-        throw new Error('Missing environment variables');
+      if (!token || !baseId) {
+        console.log('Missing env vars, using fallback');
+        // KEMBALIKAN ARRAY, BUKAN OBJECT!
+        return new Response(JSON.stringify([
+          { id: "fallback1", employeeName: "Test Data 1", amount: 100000 },
+          { id: "fallback2", employeeName: "Test Data 2", amount: 200000 }
+        ]), { status: 200, headers });
       }
 
-      const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Expenses`;
-      
+      const url = `https://api.airtable.com/v0/${baseId}/Expenses`;
       const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      if (!response.ok) {
-        throw new Error(`Airtable error: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Airtable error: ${response.status}`);
       
       const data = await response.json();
+      
+      // TRANSFORM KE ARRAY
       const expenses = data.records.map(record => ({
         id: record.id,
         employeeName: record.fields.employeeName || '',
@@ -46,6 +45,7 @@ export async function onRequest(context) {
         status: record.fields.status || 'pending',
       }));
       
+      // PASTIKAN RETURN ARRAY
       return new Response(JSON.stringify(expenses), { 
         status: 200, 
         headers 
@@ -53,16 +53,12 @@ export async function onRequest(context) {
       
     } catch (error) {
       console.error('Error:', error);
-      return new Response(JSON.stringify({ 
-        error: error.message,
-        fallback: true,
-        data: [
-          { id: "rec1", employeeName: "Mode Offline", amount: 150000 }
-        ]
-      }), { status: 200, headers });
+      // FALLBACK TETAP ARRAY
+      return new Response(JSON.stringify([
+        { id: "error1", employeeName: "Error Mode", amount: 0 }
+      ]), { status: 200, headers });
     }
   }
 
-  return new Response('Method not allowed', { status: 405, headers });
+  return new Response('[]', { status: 405, headers });
 }
-
