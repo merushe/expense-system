@@ -1,5 +1,5 @@
 // api.js - CLIENT-SIDE VERSION (memanggil serverless function)
-const API_BASE_URL = '/.netlify/functions/expenses';
+const API_BASE_URL = '/api/expenses';
 
 window.airtableService = {
     // Test koneksi
