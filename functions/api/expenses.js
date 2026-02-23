@@ -36,14 +36,47 @@ export async function onRequest(context) {
       
       const data = await response.json();
       
-      // TRANSFORM KE ARRAY
-      const expenses = data.records.map(record => ({
-        id: record.id,
-        employeeName: record.fields.employeeName || '',
-        amount: record.fields.amount || 0,
-        category: record.fields.category || 'other',
-        status: record.fields.status || 'pending',
-      }));
+// TRANSFORM KE ARRAY DENGAN SEMUA FIELD
+const expenses = data.records.map(record => ({
+  id: record.id,
+  airtableId: record.id,
+  
+  // Employee Information
+  employeeName: record.fields.employeeName || '',
+  name: record.fields.employeeName || '',
+  division: record.fields.division || '',
+  manager: record.fields.manager || '',
+  
+  // Expense Details
+  date: record.fields.expenseDate || '',
+  expenseDate: record.fields.expenseDate || '',
+  type: record.fields.expenseType || 'reimbursement',
+  expenseType: record.fields.expenseType || 'reimbursement',
+  category: record.fields.category || 'other',
+  project: record.fields.project || '',
+  description: record.fields.description || '',
+  amount: Number(record.fields.amount || 0),
+  
+  // Payment & Status
+  paymentMethod: record.fields.paymentMethod || 'bank-transfer',
+  urgency: record.fields.urgency || 'normal',
+  status: record.fields.status || 'pending',
+  paymentStatus: record.fields.paymentStatus || 'pending',
+  hasAttachment: Boolean(record.fields.hasAttachment),
+  
+  // Approval Tracking
+  submittedDate: record.fields.submittedDate || '',
+  lastUpdated: record.fields.lastUpdated || '',
+  subApprovedBy: record.fields.subApprovedBy || '',
+  subApprovedDate: record.fields.subApprovedDate || '',
+  approvedBy: record.fields.approvedBy || '',
+  approvalDate: record.fields.approvalDate || '',
+  paidBy: record.fields.paidBy || '',
+  paymentDate: record.fields.paymentDate || '',
+  rejectionReason: record.fields.rejectionReason || '',
+  
+  source: 'airtable'
+}));
       
       // PASTIKAN RETURN ARRAY
       return new Response(JSON.stringify(expenses), { 
