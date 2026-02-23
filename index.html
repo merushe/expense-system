@@ -15,63 +15,20 @@
     <!-- Tombol Login -->
     <button id="login-btn">Login</button>
     <button id="logout-btn" style="display:none;">Logout</button>
+<!-- UNTUK SEMENTARA: BYPASS LOGIN -->
+<script>
+  // Bypass login untuk testing
+  window.currentUser = {
+    email: 'admin@test.com',
+    app_metadata: { roles: ['admin'] }
+  };
+  window.loggedIn = true;
+  
+  // Langsung redirect ke dashboard
+  window.location.href = '/Dashboard.html';
+  
+  console.log('🔓 Bypass mode: langsung ke dashboard');
+</script>
 
-    <!-- Netlify Identity Widget -->
-    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-    <script>
-      // Inisialisasi widget
-      netlifyIdentity.init();
-      
-      // Fungsi untuk update tombol
-      function updateButtons() {
-        const user = netlifyIdentity.currentUser();
-        const loginBtn = document.getElementById('login-btn');
-        const logoutBtn = document.getElementById('logout-btn');
-        
-        if (user) {
-          loginBtn.style.display = 'none';
-          logoutBtn.style.display = 'inline-block';
-          alert(`Selamat datang! Role Anda: ${user.app_metadata?.roles?.join(', ') || 'tidak ada'}`);
-          window.location.href = '/Dashboard.html';
-        } else {
-          loginBtn.style.display = 'inline-block';
-          logoutBtn.style.display = 'none';
-        }
-      }
-
-      // Event saat halaman dimuat
-      document.addEventListener('DOMContentLoaded', function() {
-        // Tombol login
-        document.getElementById('login-btn').addEventListener('click', function(e) {
-          e.preventDefault();
-          netlifyIdentity.open();
-        });
-
-        // Tombol logout
-        document.getElementById('logout-btn').addEventListener('click', function(e) {
-          e.preventDefault();
-          netlifyIdentity.logout();
-        });
-
-        // Cek status login
-        updateButtons();
-      });
-
-      // Event listener
-      netlifyIdentity.on('login', function(user) {
-        console.log('Login success:', user.email);
-        updateButtons();
-      });
-
-      netlifyIdentity.on('logout', function() {
-        console.log('Logout success');
-        updateButtons();
-      });
-
-      netlifyIdentity.on('error', function(err) {
-        console.error('Identity error:', err);
-        alert('Error: ' + err.message);
-      });
-    </script>
 </body>
 </html>
