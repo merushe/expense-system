@@ -3,6 +3,11 @@ export async function onRequest(context) {
   const { request, env } = context;
   
   console.log('🎯 Cloudflare Function called');
+  console.log('🔍 ENV CHECK:');
+  console.log('- Token exists:', !!env.AIRTABLE_TOKEN);
+  console.log('- Token length:', env.AIRTABLE_TOKEN ? env.AIRTABLE_TOKEN.length : 0);
+  console.log('- Base ID exists:', !!env.AIRTABLE_BASE_ID);
+  console.log('- Base ID value:', env.AIRTABLE_BASE_ID);
   
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -19,76 +24,89 @@ export async function onRequest(context) {
       const baseId = env.AIRTABLE_BASE_ID;
       
       if (!token || !baseId) {
-        console.log('Missing env vars, using fallback');
-        // KEMBALIKAN ARRAY, BUKAN OBJECT!
+        console.log('❌ Missing env vars!');
         return new Response(JSON.stringify([
-          { id: "fallback1", employeeName: "Test Data 1", amount: 100000 },
-          { id: "fallback2", employeeName: "Test Data 2", amount: 200000 }
+          { id: "fallback1", employeeName: "Env Vars Missing", amount: 0 }
         ]), { status: 200, headers });
       }
 
+      console.log('🌐 Fetching from Airtable...');
       const url = `https://api.airtable.com/v0/${baseId}/Expenses`;
+      console.log('URL:', url);
+      
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      if (!response.ok) throw new Error(`Airtable error: ${response.status}`);
+      console.log('Airtable response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Airtable error response:', errorText);
+        throw new Error(`Airtable error: ${response.status}`);
+      }
       
       const data = await response.json();
+      console.log('✅ Airtable success, records:', data.records?.length || 0);
       
-// TRANSFORM KE ARRAY DENGAN SEMUA FIELD
-const expenses = data.records.map(record => ({
-  id: record.id,
-  airtableId: record.id,
-  
-  // Employee Information
-  employeeName: record.fields.employeeName || '',
-  name: record.fields.employeeName || '',
-  division: record.fields.division || '',
-  manager: record.fields.manager || '',
-  
-  // Expense Details
-  date: record.fields.expenseDate || '',
-  expenseDate: record.fields.expenseDate || '',
-  type: record.fields.expenseType || 'reimbursement',
-  expenseType: record.fields.expenseType || 'reimbursement',
-  category: record.fields.category || 'other',
-  project: record.fields.project || '',
-  description: record.fields.description || '',
-  amount: Number(record.fields.amount || 0),
-  
-  // Payment & Status
-  paymentMethod: record.fields.paymentMethod || 'bank-transfer',
-  urgency: record.fields.urgency || 'normal',
-  status: record.fields.status || 'pending',
-  paymentStatus: record.fields.paymentStatus || 'pending',
-  hasAttachment: Boolean(record.fields.hasAttachment),
-  
-  // Approval Tracking
-  submittedDate: record.fields.submittedDate || '',
-  lastUpdated: record.fields.lastUpdated || '',
-  subApprovedBy: record.fields.subApprovedBy || '',
-  subApprovedDate: record.fields.subApprovedDate || '',
-  approvedBy: record.fields.approvedBy || '',
-  approvalDate: record.fields.approvalDate || '',
-  paidBy: record.fields.paidBy || '',
-  paymentDate: record.fields.paymentDate || '',
-  rejectionReason: record.fields.rejectionReason || '',
-  
-  source: 'airtable'
-}));
+      // TRANSFORM KE ARRAY DENGAN SEMUA FIELD
+      const expenses = data.records.map(record => ({
+        id: record.id,
+        airtableId: record.id,
+        
+        // Employee Information
+        employeeName: record.fields.employeeName || '',
+        name: record.fields.employeeName || '',
+        division: record.fields.division || '',
+        manager: record.fields.manager || '',
+        
+        // Expense Details
+        date: record.fields.expenseDate || '',
+        expenseDate: record.fields.expenseDate || '',
+        type: record.fields.expenseType || 'reimbursement',
+        expenseType: record.fields.expenseType || 'reimbursement',
+        category: record.fields.category || 'other',
+        project: record.fields.project || '',
+        description: record.fields.description || '',
+        amount: Number(record.fields.amount || 0),
+        
+        // Payment & Status
+        paymentMethod: record.fields.paymentMethod || 'bank-transfer',
+        urgency: record.fields.urgency || 'normal',
+        status: record.fields.status || 'pending',
+        paymentStatus: record.fields.paymentStatus || 'pending',
+        hasAttachment: Boolean(record.fields.hasAttachment),
+        
+        // Approval Tracking
+        submittedDate: record.fields.submittedDate || '',
+        lastUpdated: record.fields.lastUpdated || '',
+        subApprovedBy: record.fields.subApprovedBy || '',
+        subApprovedDate: record.fields.subApprovedDate || '',
+        approvedBy: record.fields.approvedBy || '',
+        approvalDate: record.fields.approvalDate || '',
+        paidBy: record.fields.paidBy || '',
+        paymentDate: record.fields.paymentDate || '',
+        rejectionReason: record.fields.rejectionReason || '',
+        
+        source: 'airtable'
+      }));
       
-      // PASTIKAN RETURN ARRAY
+      console.log(`📊 Sending ${expenses.length} records`);
       return new Response(JSON.stringify(expenses), { 
         status: 200, 
         headers 
       });
       
     } catch (error) {
-      console.error('Error:', error);
-      // FALLBACK TETAP ARRAY
+      console.error('❌ Function error:', error);
       return new Response(JSON.stringify([
-        { id: "error1", employeeName: "Error Mode", amount: 0 }
+        { 
+          id: "error1", 
+          employeeName: `Error: ${error.message}`, 
+          amount: 0,
+          division: 'Check Console',
+          manager: 'For Details'
+        }
       ]), { status: 200, headers });
     }
   }
