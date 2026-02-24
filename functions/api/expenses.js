@@ -1,3 +1,4 @@
+// UPDATED: Added POST handler for creating expenses - 24 Feb 202
 // functions/api/expenses.js
 export async function onRequest(context) {
   const { request, env } = context;
