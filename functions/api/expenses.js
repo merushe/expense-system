@@ -14,10 +14,12 @@ export async function onRequest(context) {
     'Content-Type': 'application/json',
   };
 
+  // Handle OPTIONS request (CORS preflight)
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers });
   }
 
+  // HANDLER GET - Ambil semua data (YANG SUDAH ADA)
   if (request.method === 'GET') {
     try {
       const token = env.AIRTABLE_TOKEN;
@@ -111,5 +113,88 @@ export async function onRequest(context) {
     }
   }
 
-  return new Response('[]', { status: 405, headers });
+  // ===========================================
+  // HANDLER POST - Buat data baru (TAMBAHKAN DI SINI!)
+  // ===========================================
+  if (request.method === 'POST') {
+    try {
+      console.log('📝 POST request received');
+      
+      const token = env.AIRTABLE_TOKEN;
+      const baseId = env.AIRTABLE_BASE_ID;
+      
+      if (!token || !baseId) {
+        console.log('❌ Missing env vars!');
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Missing environment variables' 
+        }), { status: 500, headers });
+      }
+
+      // Parse data dari request body
+      const requestData = await request.json();
+      console.log('📦 Data received:', requestData);
+
+      // Format data untuk Airtable
+      const fields = {
+        employeeName: requestData.employeeName || '',
+        division: requestData.division || '',
+        manager: requestData.manager || '',
+        expenseDate: requestData.expenseDate || new Date().toISOString().split('T')[0],
+        expenseType: requestData.expenseType || 'reimbursement',
+        category: requestData.category || 'other',
+        project: requestData.project || '',
+        description: requestData.description || '',
+        amount: Number(requestData.amount) || 0,
+        paymentMethod: requestData.paymentMethod || 'bank-transfer',
+        urgency: requestData.urgency || 'normal',
+        status: requestData.status || 'pending',
+        paymentStatus: requestData.paymentStatus || 'pending',
+        hasAttachment: Boolean(requestData.hasAttachment),
+        submittedDate: requestData.submittedDate || new Date().toISOString().split('T')[0],
+        lastUpdated: new Date().toISOString().split('T')[0]
+      };
+
+      console.log('📤 Sending to Airtable:', fields);
+
+      const url = `https://api.airtable.com/v0/${baseId}/Expenses`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ fields })
+      });
+
+      console.log('Airtable response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Airtable error:', errorText);
+        throw new Error(`Airtable error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Record created:', result.id);
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        recordId: result.id 
+      }), { status: 200, headers });
+
+    } catch (error) {
+      console.error('❌ POST error:', error);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: error.message 
+      }), { status: 500, headers });
+    }
+  }
+
+  // Jika method tidak di-handle (PUT, DELETE, dll)
+  console.log(`❌ Method not allowed: ${request.method}`);
+  return new Response(JSON.stringify({ 
+    error: 'Method not allowed' 
+  }), { status: 405, headers });
 }
