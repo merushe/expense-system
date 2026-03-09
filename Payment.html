@@ -15,7 +15,11 @@
             background-color: #f8f9fa;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        .navbar {
+        .navbar-nav .nav-link.active {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 5px;
+        }        
+.navbar {
             background: linear-gradient(135deg, #2c3e50 0%, #1a2530 100%);
             margin-bottom: 30px;
         }
@@ -228,158 +232,19 @@
 
 <script src="sync-manager.js"></script>
 <script>
-// OVERRIDE FUNGSI UNTUK PAYMENT.HTML
-
-// Simpan fungsi asli
-const originalLoadExpenses = window.loadExpenses;
-const originalUpdatePaymentStatus = window.updatePaymentStatus;
-
-// Override loadExpenses
-window.loadExpenses = async function() {
-    try {
-        console.log('Loading consolidated payment data...');
-        
-        if (window.airtableService && window.airtableService.getConsolidatedData) {
-            allExpenses = await window.airtableService.getConsolidatedData();
-            console.log(`Loaded ${allExpenses.length} consolidated expenses`);
-            
-            // Hitung statistics
-            const awaiting = allExpenses.filter(item => 
-                item.status === 'approved' && 
-                (!item.paymentStatus || item.paymentStatus !== 'paid')
-            ).length;
-            
-            const today = new Date().toISOString().split('T')[0];
-            const processedToday = allExpenses.filter(item => 
-                item.paymentStatus === 'paid' && 
-                item.paymentDate === today
-            ).length;
-            
-            const totalApproved = allExpenses.filter(item => 
-                item.status === 'approved'
-            ).length;
-            
-            // Calculate this month's total
-            const now = new Date();
-            const thisMonth = now.getMonth() + 1;
-            const thisYear = now.getFullYear();
-            
-            const totalAmount = allExpenses
-                .filter(item => {
-                    if (!item.paymentDate) return false;
-                    const paymentDate = new Date(item.paymentDate);
-                    return paymentDate.getMonth() + 1 === thisMonth && 
-                           paymentDate.getFullYear() === thisYear;
-                })
-                .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
-            
-            // Update UI
-            document.getElementById('awaitingCount').textContent = awaiting;
-            document.getElementById('processedCount').textContent = processedToday;
-            document.getElementById('totalApproved').textContent = totalApproved;
-            document.getElementById('totalAmount').textContent = 'Rp ' + formatCurrency(totalAmount);
-            
-            // Render tab
-            if (typeof renderTab === 'function') {
-                renderTab(currentTab);
-            }
-            
-            // Update connection status
-            if (window.SyncManager) {
-                const status = window.SyncManager.getConnectionStatus();
-                const syncIndicator = document.getElementById('syncIndicator');
-                const syncText = document.getElementById('syncText');
-                const dataSourceLabel = document.getElementById('dataSourceLabel');
-                const paymentStatus = document.getElementById('paymentStatus');
-                
-                if (syncIndicator) {
-                    syncIndicator.className = status.isOnline ? 
-                        'alert alert-sm alert-success mb-0 shadow' : 
-                        'alert alert-sm alert-danger mb-0 shadow';
-                }
-                if (syncText) {
-                    syncText.textContent = status.isOnline ? 
-                        `Online (${allExpenses.length} records)` : 'Offline - Using Local';
-                }
-                if (dataSourceLabel) {
-                    dataSourceLabel.textContent = status.isOnline ? 'From Airtable' : 'From Local Storage';
-                }
-                if (paymentStatus) {
-                    paymentStatus.textContent = status.isOnline ? 'Connected to cloud' : 'Working offline';
-                }
-            }
-            
-        } else {
-            if (originalLoadExpenses) await originalLoadExpenses();
-        }
-    } catch (error) {
-        console.error('Error loading consolidated data:', error);
-        if (originalLoadExpenses) await originalLoadExpenses();
-    }
-};
-
-// Override updatePaymentStatus
-window.updatePaymentStatus = async function(expenseId, paymentDate, paymentMethod, paidBy) {
-    try {
-        const expense = allExpenses.find(item => item.id === expenseId);
-        if (!expense) {
-            alert('Expense not found!');
-            return;
-        }
-        
-        const updateData = {
-            paymentStatus: 'paid',
-            paymentDate: paymentDate,
-            paymentMethod: paymentMethod,
-            paidBy: paidBy,
-            status: 'paid',
-            lastUpdated: new Date().toISOString()
-        };
-        
-        window._updatingPayment = true;
-        
-        let result = { success: false };
-        
-        if (window.airtableService && window.SyncManager && window.SyncManager.isOnline) {
-            result = await window.airtableService.updateExpense(expense.airtableId || expenseId, updateData);
-        }
-        
-        // Update localStorage
-        try {
-            const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
-            const index = localData.findIndex(item => 
-                item.airtableId === expense.airtableId || item.id === expenseId
-            );
-            if (index >= 0) {
-                localData[index] = { ...localData[index], ...updateData };
-                localStorage.setItem('expenseSubmissions', JSON.stringify(localData));
-            }
-        } catch (e) {}
-        
-        window._updatingPayment = false;
-        
-        if (result.success || !window.SyncManager?.isOnline) {
-            alert('✅ Payment recorded successfully!');
-            loadExpenses();
-        } else {
-            alert(`⚠️ Payment recorded locally. Will sync when online.`);
-            loadExpenses();
-        }
-        
-    } catch (error) {
-        console.error('Error updating payment:', error);
-        window._updatingPayment = false;
-        alert('Error recording payment.');
-    }
-};
-
-// Fungsi manual sync
-function manualSync() {
-    if (window.SyncManager) {
-        window.SyncManager.manualSync();
-    } else {
-        alert('Sync Manager not available');
-    }
+const user = JSON.parse(sessionStorage.getItem('user'));
+if (!user) {
+    window.location.href = '/login.html';
+}
+// Finance dan admin yang boleh akses
+if (user.role !== 'finance' && user.role !== 'admin') {
+    alert('Halaman ini hanya untuk Finance dan Admin');
+    window.location.href = '/Dashboard.html';
+}
+if (user.role === 'finance') {
+    // Mereka sudah di Payment.html, jadi tidak perlu redirect
+    // Tapi kita bisa kasih pesan selamat datang
+    console.log('Welcome Finance User');
 }
 </script>
     
@@ -437,18 +302,35 @@ function manualSync() {
             }
         }
 
-        async function loadExpenses() {
-            try {
-                console.log('Loading payment data from Airtable...');
-                
-                allExpenses = await window.airtableService.getAllExpenses();
-                console.log(`Loaded ${allExpenses.length} expenses for payment processing`);
+async function loadExpenses() {
+    try {
+        console.log('Loading payment data from Airtable...');
+        
+        allExpenses = await window.airtableService.getAllExpenses();
+        console.log(`Loaded ${allExpenses.length} expenses for payment processing`);
+        
+        // DEBUG: Lihat semua status
+        console.log('Status distribution:');
+        const statusCount = {};
+        allExpenses.forEach(item => {
+            const fields = item.fields || item;
+            statusCount[fields.status] = (statusCount[fields.status] || 0) + 1;
+        });
+        console.log(statusCount);
+        
+        // DEBUG: Cek expense dengan status approved
+        const approvedExpenses = allExpenses.filter(item => {
+            const fields = item.fields || item;
+            return fields.status === 'approved';
+        });
+        console.log('Approved expenses:', approvedExpenses.length);
                 
                 // Calculate statistics
-                const awaiting = allExpenses.filter(item => 
-                    item.status === 'approved' && 
-                    (!item.paymentStatus || item.paymentStatus !== 'paid')
-                ).length;
+const awaiting = allExpenses.filter(item => {
+    const fields = item.fields || item;
+    return fields.status === 'approved' && 
+           (!fields.paymentStatus || fields.paymentStatus !== 'paid');
+}).length;
                 
                 const today = new Date().toISOString().split('T')[0];
                 const processedToday = allExpenses.filter(item => 
@@ -513,38 +395,35 @@ function manualSync() {
             let description = '';
             
             switch(tabName) {
-                case 'awaiting':
-                    filteredExpenses = allExpenses.filter(item => 
-                        item.status === 'approved' && 
-                        (!item.paymentStatus || item.paymentStatus !== 'paid')
-                    );
-                    title = 'Expenses Awaiting Payment';
-                    description = 'Expenses with status "approved" and not yet paid';
-                    break;
-                    
-                case 'paid':
-                    filteredExpenses = allExpenses.filter(item => 
-                        item.paymentStatus === 'paid'
-                    );
-                    title = 'Paid Expenses';
-                    description = 'All expenses that have been paid';
-                    break;
-                    
-                case 'in-progress':
-                    filteredExpenses = allExpenses.filter(item => 
-                        item.status === 'pending' || 
-                        item.status === 'pending-main' || 
-                        item.status === 'sub-approved'
-                    );
-                    title = 'Expenses In Progress';
-                    description = 'Expenses still in approval process';
-                    break;
-                    
-                case 'all':
-                    filteredExpenses = allExpenses;
-                    title = 'All Payment History';
-                    description = 'Complete expense history';
-                    break;
+
+case 'awaiting':
+    filteredExpenses = allExpenses.filter(item => {
+        const fields = item.fields || item;
+        return fields.status === 'approved' && 
+               (!fields.paymentStatus || fields.paymentStatus !== 'paid');
+    });
+    break;
+   
+case 'paid':
+    filteredExpenses = allExpenses.filter(item => {
+        const fields = item.fields || item;
+        return fields.paymentStatus === 'paid';
+    });
+    break;
+
+case 'in-progress':
+    filteredExpenses = allExpenses.filter(item => {
+        const fields = item.fields || item;
+        return fields.status === 'pending' || 
+               fields.status === 'pending-main' || 
+               fields.status === 'sub-approved';
+    });
+    break;
+
+case 'all':
+    filteredExpenses = allExpenses;
+    break;               
+
             }
             
             const container = document.getElementById(tabName === 'in-progress' ? 'inProgressList' : tabName + 'List');
@@ -582,265 +461,372 @@ function manualSync() {
                 return dateB - dateA;
             });
             
-            let html = '';
-            filteredExpenses.forEach(expense => {
-                const statusBadge = getStatusBadge(expense);
-                const actions = getActionButtons(expense);
-                const approvalFlow = getApprovalFlow(expense);
-                
-                html += `
-                    <div class="payment-card ${expense.paymentStatus === 'paid' ? 'paid' : expense.status === 'approved' ? 'approved' : ''}">
-                        <div class="row">
-                            <div class="col-md-8">
-                                <h5>${expense.project || 'No Project'}</h5>
-                                <p class="mb-1">${expense.name || 'Unknown'} • ${expense.division || 'Unknown'} • ${formatDate(expense.date)}</p>
-                                <p class="text-muted mb-2">${expense.description || 'No description'}</p>
-                                <div class="approval-flow mb-2">${approvalFlow}</div>
-                                <p class="mb-0">
-                                    <small class="text-muted">
-                                        Manager: ${expense.manager || 'Unknown'} • 
-                                        Payment Method: ${expense.paymentMethod || 'Not specified'}
-                                        ${expense.subApprovedBy ? ` • Sub Approved by: ${expense.subApprovedBy}` : ''}
-                                        ${expense.approvedBy ? ` • Approved by: ${expense.approvedBy}` : ''}
-                                        ${expense.paidBy ? ` • Paid by: ${expense.paidBy}` : ''}
-                                        ${expense.hasAttachment ? ' • <i class="bi bi-paperclip"></i> Bukti Tersedia' : ''}
-                                    </small>
-                                </p>
-                            </div>
-                            <div class="col-md-4 text-end">
-                                <h4 class="text-primary">Rp ${formatCurrency(expense.amount || 0)}</h4>
-                                <div class="mb-2">${statusBadge}</div>
-                                ${expense.urgency === 'critical' ? '<span class="badge bg-danger">URGENT</span>' : 
-                                  expense.urgency === 'urgent' ? '<span class="badge bg-warning text-dark">URGENT</span>' : ''}
-                                ${expense.paymentStatus === 'paid' ? 
-                                    `<small class="text-muted d-block">Paid on: ${formatDate(expense.paymentDate)}</small>` : ''}
-                                ${actions}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
+let html = '';
+filteredExpenses.forEach(expense => {
+    const fields = expense.fields || expense;  // <-- TAMBAHKAN INI
+    const statusBadge = getStatusBadge(expense); // fungsi ini juga perlu diperbaiki
+    const actions = getActionButtons(expense);
+    const approvalFlow = getApprovalFlow(expense);
+    
+    html += `
+        <div class="payment-card ${fields.paymentStatus === 'paid' ? 'paid' : fields.status === 'approved' ? 'approved' : ''}">
+            <div class="row">
+                <div class="col-md-8">
+                    <h5>${fields.project || 'No Project'}</h5>
+                    <p class="mb-1">${fields.employeeName || 'Unknown'} • ${fields.division || 'Unknown'} • ${formatDate(fields.expenseDate)}</p>
+                    <p class="text-muted mb-2">${fields.description || 'No description'}</p>
+                    <div class="approval-flow mb-2">${approvalFlow}</div>
+                    <p class="mb-0">
+                        <small class="text-muted">
+                            Manager: ${fields.manager || 'Unknown'} • 
+                            Payment Method: ${fields.paymentMethod || 'Not specified'}
+                            ${fields.subApprovedBy ? ` • Sub Approved by: ${fields.subApprovedBy}` : ''}
+                            ${fields.approvedBy ? ` • Approved by: ${fields.approvedBy}` : ''}
+                            ${fields.paidBy ? ` • Paid by: ${fields.paidBy}` : ''}
+                            ${fields.hasAttachment ? ' • <i class="bi bi-paperclip"></i> Bukti Tersedia' : ''}
+                        </small>
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <h4 class="text-primary">Rp ${formatCurrency(fields.amount || 0)}</h4>
+                    <div class="mb-2">${statusBadge}</div>
+                    ${fields.urgency === 'critical' ? '<span class="badge bg-danger">URGENT</span>' : 
+                      fields.urgency === 'urgent' ? '<span class="badge bg-warning text-dark">URGENT</span>' : ''}
+                    ${fields.paymentStatus === 'paid' ? 
+                        `<small class="text-muted d-block">Paid on: ${formatDate(fields.paymentDate)}</small>` : ''}
+                    ${actions}
+                </div>
+            </div>
+        </div>
+    `;
+});
             
             container.innerHTML = html;
         }
 
-        function getApprovalFlow(expense) {
-            let steps = [];
-            let currentStep = 0;
-            
-            if (expense.manager === 'Achmad Oskar Wiriadidjaja' && expense.status === 'pending-main') {
-                // Direct approval flow
-                steps = ['Request', 'Main Approval', 'Payment'];
-                if (expense.status === 'pending-main') currentStep = 1;
-                else if (expense.status === 'approved') currentStep = 2;
-                else if (expense.paymentStatus === 'paid') currentStep = 3;
-            } else {
-                // Normal 2-step flow
-                steps = ['Request', 'Sub Approval', 'Main Approval', 'Payment'];
-                if (expense.status === 'pending') currentStep = 1;
-                else if (expense.status === 'sub-approved') currentStep = 2;
-                else if (expense.status === 'approved') currentStep = 3;
-                else if (expense.paymentStatus === 'paid') currentStep = 4;
-            }
-            
-            let html = '';
-            for (let i = 0; i < steps.length; i++) {
-                let stepClass = '';
-                if (i < currentStep) stepClass = 'completed';
-                else if (i === currentStep) stepClass = 'active';
-                
-                html += `<span class="step ${stepClass}">${steps[i]}</span>`;
-            }
-            return html;
-        }
+function getApprovalFlow(expense) {
+    const fields = expense.fields || expense;  // <-- TAMBAHKAN INI
+    let steps = [];
+    let currentStep = 0;
+    
+    if (fields.manager === 'Achmad Oskar Wiriadidjaja' && fields.status === 'pending-main') {
+        // Direct approval flow
+        steps = ['Request', 'Main Approval', 'Payment'];
+        if (fields.status === 'pending-main') currentStep = 1;
+        else if (fields.status === 'approved') currentStep = 2;
+        else if (fields.paymentStatus === 'paid') currentStep = 3;
+    } else {
+        // Normal 2-step flow
+        steps = ['Request', 'Sub Approval', 'Main Approval', 'Payment'];
+        if (fields.status === 'pending') currentStep = 1;
+        else if (fields.status === 'sub-approved') currentStep = 2;
+        else if (fields.status === 'approved') currentStep = 3;
+        else if (fields.paymentStatus === 'paid') currentStep = 4;
+    }
+    
+    let html = '';
+    for (let i = 0; i < steps.length; i++) {
+        let stepClass = '';
+        if (i < currentStep) stepClass = 'completed';
+        else if (i === currentStep) stepClass = 'active';
+        
+        html += `<span class="step ${stepClass}">${steps[i]}</span>`;
+    }
+    return html;
+}
 
-        function getStatusBadge(expense) {
-            if (expense.paymentStatus === 'paid') {
-                return '<span class="status-badge badge-paid">PAID</span>';
-            }
-            
-            switch(expense.status) {
-                case 'pending': 
-                    return '<span class="status-badge badge-awaiting">PENDING SUB</span>';
-                case 'pending-main': 
-                    return '<span class="status-badge badge-pending-main">PENDING MAIN</span>';
-                case 'sub-approved': 
-                    return '<span class="status-badge badge-sub-approved">SUB APPROVED</span>';
-                case 'approved': 
-                    return '<span class="status-badge badge-approved">APPROVED</span>';
-                case 'rejected': 
-                    return '<span class="status-badge badge-rejected">REJECTED</span>';
-                default: 
-                    return '<span class="badge bg-secondary">' + (expense.status || 'UNKNOWN') + '</span>';
-            }
-        }
+function getStatusBadge(expense) {
+    const fields = expense.fields || expense;  // <-- TAMBAHKAN INI
+    
+    if (fields.paymentStatus === 'paid') {
+        return '<span class="status-badge badge-paid">PAID</span>';
+    }
+    
+    switch(fields.status) {
+        case 'pending': 
+            return '<span class="status-badge badge-awaiting">PENDING SUB</span>';
+        case 'pending-main': 
+            return '<span class="status-badge badge-pending-main">PENDING MAIN</span>';
+        case 'sub-approved': 
+            return '<span class="status-badge badge-sub-approved">SUB APPROVED</span>';
+        case 'approved': 
+            return '<span class="status-badge badge-approved">APPROVED</span>';
+        case 'rejected': 
+            return '<span class="status-badge badge-rejected">REJECTED</span>';
+        default: 
+            return '<span class="badge bg-secondary">' + (fields.status || 'UNKNOWN') + '</span>';
+    }
+}
 
-        function getActionButtons(expense) {
-            if (expense.status === 'approved' && (!expense.paymentStatus || expense.paymentStatus !== 'paid')) {
-                return `
-                    <div class="mt-2">
-                        <button class="btn btn-sm btn-process" onclick="markAsPaid('${expense.id}')">
-                            <i class="bi bi-check"></i> Mark as Paid
-                        </button>
-                        <button class="btn btn-sm btn-outline-info ms-2" onclick="viewExpense('${expense.id}')">
-                            <i class="bi bi-eye"></i> View
-                        </button>
-                    </div>
-                `;
-            } else {
-                return `
-                    <div class="mt-2">
-                        <button class="btn btn-sm btn-outline-secondary" onclick="viewExpense('${expense.id}')">
-                            <i class="bi bi-eye"></i> View Details
-                        </button>
-                    </div>
-                `;
-            }
-        }
+function getActionButtons(expense) {
+    const fields = expense.fields || expense;
+    
+    if (fields.status === 'approved' && (!fields.paymentStatus || fields.paymentStatus !== 'paid')) {
+        return `
+            <div class="mt-2">
+                <button class="btn btn-sm btn-process" onclick="markAsPaid('${expense.id}')">
+                    <i class="bi bi-check"></i> Mark as Paid
+                </button>
+                <button class="btn btn-sm btn-outline-info ms-2" onclick="viewExpense('${expense.id}')">
+                    <i class="bi bi-eye"></i> View
+                </button>
+            </div>
+        `;
+    } else {
+        return `
+            <div class="mt-2">
+                <button class="btn btn-sm btn-outline-secondary" onclick="viewExpense('${expense.id}')">
+                    <i class="bi bi-eye"></i> View Details
+                </button>
+            </div>
+        `;
+    }
+}
 
-        async function markAsPaid(expenseId) {
-            const expense = allExpenses.find(item => item.id === expenseId);
-            if (!expense) {
-                alert('Expense not found!');
-                return;
-            }
-            
-            if (confirm(`Mark expense as paid?\n\nProject: ${expense.project}\nAmount: Rp ${formatCurrency(expense.amount)}`)) {
-                const paymentDate = prompt('Enter payment date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
-                const paymentMethod = prompt('Enter payment method:', expense.paymentMethod || 'Bank Transfer');
-                const paidBy = prompt('Enter processor name:', 'Financing Department');
-                
-                if (paymentDate && paymentMethod && paidBy) {
-                    await updatePaymentStatus(expenseId, paymentDate, paymentMethod, paidBy);
-                }
-            }
+async function markAsPaid(expenseId) {
+    const expense = allExpenses.find(item => item.id === expenseId);
+    if (!expense) {
+        alert('Expense not found!');
+        return;
+    }
+    
+    const fields = expense.fields || expense;
+    
+    // Ambil payment method dari expense sebagai default
+    const defaultMethod = fields.paymentMethod || 'bank-transfer';
+    
+    if (confirm(`Mark expense as paid?\n\nProject: ${fields.project || 'Unknown'}\nAmount: Rp ${formatCurrency(fields.amount || 0)}`)) {
+        const paymentDate = prompt('Enter payment date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+        
+        // Tampilkan pilihan yang valid
+        const paymentMethod = prompt(
+            'Enter payment method (bank-transfer, cash, payroll, virtual account, e-wallet):', 
+            defaultMethod
+        );
+        
+        const paidBy = prompt('Enter processor name:', 'Financing Department');
+        
+        if (paymentDate && paymentMethod && paidBy) {
+            await updatePaymentStatus(expenseId, paymentDate, paymentMethod, paidBy);
         }
+    }
+}
 
-        async function updatePaymentStatus(expenseId, paymentDate, paymentMethod, paidBy) {
-            try {
-                const updateData = {
-                    paymentStatus: 'paid',
-                    paymentDate: paymentDate,
-                    paymentMethod: paymentMethod,
-                    paidBy: paidBy,
-                    status: 'paid',
-                    lastUpdated: new Date().toISOString()
-                };
-                
-                // Update in Airtable
-                const result = await window.airtableService.updateExpense(expenseId, updateData);
-                
-                if (result.success) {
-                    alert('✅ Payment recorded successfully!\n\nExpense marked as PAID.');
-                    loadExpenses();
-                } else {
-                    alert(`⚠️ Payment recorded locally. Airtable error: ${result.error}`);
-                    loadExpenses();
-                }
-                
-            } catch (error) {
-                console.error('Error updating payment:', error);
-                alert('Error recording payment.');
-            }
+async function updatePaymentStatus(expenseId, paymentDate, paymentMethod, paidBy) {
+    try {
+        // Mapping payment method ke nilai yang valid di Airtable
+        let validPaymentMethod = paymentMethod;
+        
+        // Sesuaikan dengan nilai yang ada di Airtable
+        if (paymentMethod === 'Bank Transfer') {
+            validPaymentMethod = 'bank-transfer';
+        } else if (paymentMethod === 'Virtual Account') {
+            validPaymentMethod = 'virtual account';
+        } else if (paymentMethod === 'E-Wallet') {
+            validPaymentMethod = 'e-wallet';
+        } else if (paymentMethod === 'Cash') {
+            validPaymentMethod = 'cash';
+        } else if (paymentMethod === 'Payroll') {
+            validPaymentMethod = 'payroll';
         }
+        
+        const updateData = {
+            status: 'paid',
+            paymentStatus: 'paid',
+            paymentDate: paymentDate,
+            paymentMethod: validPaymentMethod,
+            paidBy: paidBy,
+            lastUpdated: paymentDate  // Gunakan format YYYY-MM-DD
+        };
+        
+        console.log('📤 Sending update:', updateData);
+        
+        const result = await window.airtableService.updateExpense(expenseId, updateData);
+        console.log('📥 Response:', result);
+        
+        if (result && result.success) {
+            alert('✅ Payment recorded successfully!');
+            loadExpenses();
+        } else {
+            console.error('❌ Update gagal:', result);
+            alert(`⚠️ Failed: ${result?.data?.error?.message || result?.error || 'Unknown error'}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Exception:', error);
+        alert('Error recording payment: ' + error.message);
+    }
+}
 
-        async function processAllApproved() {
-            const approvedExpenses = allExpenses.filter(item => 
-                item.status === 'approved' && 
-                (!item.paymentStatus || item.paymentStatus !== 'paid')
-            );
+async function processAllApproved() {
+    const approvedExpenses = allExpenses.filter(item => {
+        const fields = item.fields || item;
+        return fields.status === 'approved' && 
+               (!fields.paymentStatus || fields.paymentStatus !== 'paid');
+    });
+    
+    if (approvedExpenses.length === 0) {
+        alert('No approved expenses awaiting payment.');
+        return;
+    }
+    
+    const totalAmount = approvedExpenses.reduce((sum, item) => {
+        const fields = item.fields || item;
+        return sum + parseFloat(fields.amount || 0);
+    }, 0);
+    
+    if (confirm(`Process ALL ${approvedExpenses.length} approved expenses as paid?\n\nTotal Amount: Rp ${formatCurrency(totalAmount)}`)) {
+        
+        // Tanya metode pembayaran yang akan digunakan untuk semua
+        const defaultMethod = 'bank-transfer'; // Default
+        const paymentMethod = prompt(
+            'Enter payment method for ALL expenses (bank-transfer, cash, payroll, virtual account, e-wallet):', 
+            defaultMethod
+        );
+        
+        if (!paymentMethod) {
+            alert('Batch processing dibatalkan.');
+            return;
+        }
+        
+        // Validasi payment method
+        const validMethods = ['bank-transfer', 'cash', 'payroll', 'virtual account', 'e-wallet'];
+        if (!validMethods.includes(paymentMethod)) {
+            alert(`Metode pembayaran tidak valid. Gunakan: ${validMethods.join(', ')}`);
+            return;
+        }
+        
+        const paidBy = prompt('Enter processor name:', 'Financing Department (Batch)');
+        if (!paidBy) {
+            alert('Batch processing dibatalkan.');
+            return;
+        }
+        
+        try {
+            const paymentDate = new Date().toISOString().split('T')[0];
             
-            if (approvedExpenses.length === 0) {
-                alert('No approved expenses awaiting payment.');
-                return;
-            }
+            let successCount = 0;
+            let errorCount = 0;
+            let errorDetails = [];
             
-            const totalAmount = approvedExpenses.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+            // Tampilkan loading indicator
+            const originalBtnText = document.querySelector('.btn-primary').innerHTML;
+            document.querySelector('.btn-primary').innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
+            document.querySelector('.btn-primary').disabled = true;
             
-            if (confirm(`Process ALL ${approvedExpenses.length} approved expenses as paid?\n\nTotal Amount: Rp ${formatCurrency(totalAmount)}`)) {
+            for (const expense of approvedExpenses) {
                 try {
-                    const paymentDate = new Date().toISOString().split('T')[0];
-                    const paidBy = 'Financing Department (Batch)';
+                    const fields = expense.fields || expense;
                     
-                    let successCount = 0;
-                    let errorCount = 0;
+                    const updateData = {
+                        status: 'paid',
+                        paymentStatus: 'paid',
+                        paymentDate: paymentDate,
+                        paymentMethod: paymentMethod,
+                        paidBy: paidBy,
+                        lastUpdated: paymentDate
+                    };
                     
-                    for (const expense of approvedExpenses) {
-                        try {
-                            const updateData = {
-                                paymentStatus: 'paid',
-                                paymentDate: paymentDate,
-                                paymentMethod: 'Batch Processing',
-                                paidBy: paidBy,
-                                status: 'paid',
-                                lastUpdated: new Date().toISOString()
-                            };
-                            
-                            const result = await window.airtableService.updateExpense(expense.id, updateData);
-                            if (result.success) {
-                                successCount++;
-                            } else {
-                                errorCount++;
-                            }
-                            
-                        } catch (error) {
-                            console.error(`Error processing ${expense.id}:`, error);
-                            errorCount++;
-                        }
-                    }
+                    console.log(`Processing ${expense.id}:`, updateData);
                     
-                    const message = successCount > 0 
-                        ? `✅ Processed ${successCount} expenses as paid!\nTotal: Rp ${formatCurrency(totalAmount)}`
-                        : '❌ Failed to process payments.';
+                    const result = await window.airtableService.updateExpense(expense.id, updateData);
                     
-                    if (errorCount > 0) {
-                        alert(`${message}\n\n${errorCount} expenses failed to sync with Airtable.`);
+                    if (result && result.success) {
+                        successCount++;
                     } else {
-                        alert(message);
+                        errorCount++;
+                        errorDetails.push({
+                            id: expense.id,
+                            project: fields.project || 'Unknown',
+                            error: result?.data?.error?.message || result?.error || 'Unknown error'
+                        });
                     }
-                    
-                    loadExpenses();
                     
                 } catch (error) {
-                    console.error('Error batch processing:', error);
-                    alert('Error processing payments.');
+                    errorCount++;
+                    errorDetails.push({
+                        id: expense.id,
+                        project: expense.fields?.project || 'Unknown',
+                        error: error.message
+                    });
                 }
             }
+            
+            // Kembalikan tombol ke normal
+            document.querySelector('.btn-primary').innerHTML = originalBtnText;
+            document.querySelector('.btn-primary').disabled = false;
+            
+            // Tampilkan hasil
+            if (successCount > 0) {
+                let message = `✅ Processed ${successCount} expenses as paid!\n`;
+                message += `Total: Rp ${formatCurrency(totalAmount)}\n`;
+                message += `Payment Method: ${paymentMethod}\n`;
+                message += `Date: ${paymentDate}`;
+                
+                if (errorCount > 0) {
+                    message += `\n\n❌ ${errorCount} expenses failed:`;
+                    errorDetails.slice(0, 3).forEach(err => {
+                        message += `\n- ${err.project}: ${err.error}`;
+                    });
+                    if (errorDetails.length > 3) {
+                        message += `\n... and ${errorDetails.length - 3} more errors.`;
+                    }
+                }
+                
+                alert(message);
+            } else {
+                alert(`❌ Failed to process payments. All ${errorCount} expenses failed.`);
+                console.error('Error details:', errorDetails);
+            }
+            
+            loadExpenses();
+            
+        } catch (error) {
+            console.error('Error batch processing:', error);
+            alert('Error processing payments: ' + error.message);
+            
+            // Kembalikan tombol ke normal
+            document.querySelector('.btn-primary').innerHTML = '<i class="bi bi-check-all"></i> Process All Approved';
+            document.querySelector('.btn-primary').disabled = false;
         }
+    }
+}
 
-        function viewExpense(expenseId) {
-            const expense = allExpenses.find(item => item.id === expenseId);
-            if (expense) {
-                let details = `Expense Details:\n\n` +
-                      `ID: ${expense.id}\n` +
-                      `Project: ${expense.project}\n` +
-                      `Employee: ${expense.name}\n` +
-                      `Division: ${expense.division}\n` +
-                      `Amount: Rp ${formatCurrency(expense.amount)}\n` +
-                      `Status: ${expense.status}\n` +
-                      `Payment Status: ${expense.paymentStatus || 'Not paid'}\n` +
-                      `Manager: ${expense.manager}\n` +
-                      `Submitted: ${formatDate(expense.submittedDate)}\n`;
-                
-                if (expense.subApprovedBy) {
-                    details += `Sub Approved by: ${expense.subApprovedBy} on ${expense.subApprovedDate}\n`;
-                }
-                if (expense.approvedBy) {
-                    details += `Approved by: ${expense.approvedBy} on ${expense.approvalDate}\n`;
-                }
-                if (expense.paymentDate) {
-                    details += `Payment Date: ${expense.paymentDate}\n`;
-                    details += `Payment Method: ${expense.paymentMethod}\n`;
-                    details += `Paid by: ${expense.paidBy}\n`;
-                }
-                if (expense.rejectionReason) {
-                    details += `Rejection Reason: ${expense.rejectionReason}\n`;
-                }
-                details += `Description: ${expense.description || 'No description'}`;
-                
-                alert(details);
-            }
+function viewExpense(expenseId) {
+    const expense = allExpenses.find(item => item.id === expenseId);
+    if (expense) {
+        const fields = expense.fields || expense;  // <-- TAMBAHKAN INI
+        
+        let details = `Expense Details:\n\n` +
+              `ID: ${expense.id}\n` +
+              `Project: ${fields.project || 'N/A'}\n` +
+              `Employee: ${fields.employeeName || 'Unknown'}\n` +
+              `Division: ${fields.division || '-'}\n` +
+              `Amount: Rp ${formatCurrency(fields.amount || 0)}\n` +
+              `Status: ${fields.status || 'Unknown'}\n` +
+              `Payment Status: ${fields.paymentStatus || 'Not paid'}\n` +
+              `Manager: ${fields.manager || '-'}\n` +
+              `Submitted: ${formatDate(fields.submittedDate)}\n`;
+        
+        if (fields.subApprovedBy) {
+            details += `Sub Approved by: ${fields.subApprovedBy} on ${fields.subApprovedDate}\n`;
         }
+        if (fields.approvedBy) {
+            details += `Approved by: ${fields.approvedBy} on ${fields.approvalDate}\n`;
+        }
+        if (fields.paymentDate) {
+            details += `Payment Date: ${fields.paymentDate}\n`;
+            details += `Payment Method: ${fields.paymentMethod}\n`;
+            details += `Paid by: ${fields.paidBy}\n`;
+        }
+        if (fields.rejectionReason) {
+            details += `Rejection Reason: ${fields.rejectionReason}\n`;
+        }
+        details += `Description: ${fields.description || 'No description'}`;
+        
+        alert(details);
+    }
+}
 
         async function refreshData() {
             await loadExpenses();

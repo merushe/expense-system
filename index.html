@@ -1,34 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Expense System - Login</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
-        button:hover { background: #0056b3; }
-    </style>
+    <title>Test Page</title>
 </head>
 <body>
-    <h1>Expense System</h1>
-    <p>Silakan login untuk mengakses aplikasi.</p>
-    
-    <!-- Tombol Login -->
-    <button id="login-btn">Login</button>
-    <button id="logout-btn" style="display:none;">Logout</button>
-<!-- UNTUK SEMENTARA: BYPASS LOGIN -->
-<script>
-  // Bypass login untuk testing
-  window.currentUser = {
-    email: 'admin@test.com',
-    app_metadata: { roles: ['admin'] }
-  };
-  window.loggedIn = true;
-  
-  // Langsung redirect ke dashboard
-  window.location.href = '/Dashboard.html';
-  
-  console.log('🔓 Bypass mode: langsung ke dashboard');
-</script>
-
+    <h1>Test Page</h1>
+    <p>Ini halaman test tanpa proteksi.</p>
+    <script>
+        // Test API
+        fetch('/hello')
+            .then(res => res.text())
+            .then(text => console.log('API Response:', text))
+            .catch(err => console.error('API Error:', err));
+    </script>
 </body>
 </html>

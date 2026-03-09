@@ -15,6 +15,10 @@
             background-color: #f8f9fa;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+        .navbar-nav .nav-link.active {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 5px;
+        }
         .navbar {
             background: linear-gradient(135deg, #2c3e50 0%, #1a2530 100%);
             margin-bottom: 30px;
@@ -132,9 +136,6 @@
                             </button>
                             <button type="button" class="btn btn-outline-success" onclick="setRole('main-approval')">
                                 Main Approval (Achmad Oskar Wiriadidjaja)
-                            </button>
-                            <button type="button" class="btn btn-outline-info" onclick="setRole('payment')">
-                                Payment (Financing)
                             </button>
                         </div>
                         <div class="mt-2">
@@ -257,397 +258,221 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="sync-manager.js"></script>
 
-<script src="sync-manager.js"></script>
-<script>
-// OVERRIDE FUNGSI - VERSI FINAL UNTUK APPROVAL.HTML
-
-// Simpan fungsi asli
-const originalLoadExpenses = window.loadExpenses;
-const originalUpdateExpenseStatus = window.updateExpenseStatus;
-const originalUpdatePaymentStatus = window.updatePaymentStatus;
-
-// Variable global dari script bawah - akses langsung
-// Tidak perlu dideklarasikan ulang
-
-// Override loadExpenses
-window.loadExpenses = async function() {
-    try {
-        console.log('Loading consolidated data...');
-        
-        if (window.airtableService && window.airtableService.getConsolidatedData) {
-            allExpenses = await window.airtableService.getConsolidatedData();
-            console.log(`Loaded ${allExpenses.length} consolidated expenses`);
-            
-            // Hitung ulang statistics berdasarkan currentRole
-            let pendingForMe = 0;
-            if (currentRole === 'sub-approval') {
-                pendingForMe = allExpenses.filter(item => 
-                    item.status === 'pending' && 
-                    subApprovers.includes(item.manager)
-                ).length;
-            } else if (currentRole === 'main-approval') {
-                pendingForMe = allExpenses.filter(item => 
-                    item.status === 'sub-approved' || item.status === 'pending-main'
-                ).length;
-            } else if (currentRole === 'payment') {
-                pendingForMe = allExpenses.filter(item => 
-                    item.status === 'approved' && 
-                    item.paymentStatus !== 'paid'
-                ).length;
-            }
-            
-            // Update statistics
-            document.getElementById('pendingCount').textContent = pendingForMe;
-            document.getElementById('subApprovedCount').textContent = 
-                allExpenses.filter(item => item.status === 'sub-approved').length;
-            document.getElementById('approvedCount').textContent = 
-                allExpenses.filter(item => item.status === 'approved').length;
-            document.getElementById('urgentCount').textContent = 
-                allExpenses.filter(item => item.urgency === 'critical').length;
-            
-            // Render tab
-            if (typeof renderTab === 'function') {
-                renderTab(currentTab);
-            }
-            
-            // Update connection status
-            if (window.SyncManager) {
-                const status = window.SyncManager.getConnectionStatus();
-                const syncBadge = document.getElementById('syncBadge');
-                const dataSourceInfo = document.getElementById('dataSourceInfo');
-                const connectionBanner = document.getElementById('connectionBanner');
-                
-                if (syncBadge) {
-                    syncBadge.className = status.isOnline ? 'badge bg-success' : 'badge bg-danger';
-                    syncBadge.textContent = status.isOnline ? 'Online' : 'Offline';
-                }
-                if (dataSourceInfo) {
-                    dataSourceInfo.textContent = status.isOnline ? 
-                        `From Airtable (${allExpenses.length} records)` : 'From Local Storage';
-                }
-                if (connectionBanner) {
-                    connectionBanner.style.display = status.isOnline ? 'none' : 'block';
-                }
-            }
-            
-        } else {
-            if (originalLoadExpenses) await originalLoadExpenses();
-        }
-    } catch (error) {
-        console.error('Error loading consolidated data:', error);
-        if (originalLoadExpenses) await originalLoadExpenses();
+    <script>
+        // ============================================
+        // CEK LOGIN
+        // ============================================
+(function() {
+    const user = JSON.parse(sessionStorage.getItem('user'));
+    if (!user) {
+        window.location.href = '/login.html';
+        return;
     }
-};
-
-// Override updateExpenseStatus
-window.updateExpenseStatus = async function(expenseId, status, reason = '', approvalLevel = '') {
-    try {
-        const expense = allExpenses.find(item => item.id === expenseId);
-        if (!expense) {
-            alert('Expense not found!');
-            return;
-        }
-        
-        const updateData = {
-            status: status,
-            // Gunakan format YYYY-MM-DD untuk lastUpdated
-            lastUpdated: new Date().toISOString().split('T')[0]
-        };
-        
-        window._updatingExpense = true;
-        
-        if (status === 'sub-approved') {
-            updateData.subApprovedDate = new Date().toISOString().split('T')[0];
-            updateData.subApprovedBy = currentRole === 'sub-approval' ? expense.manager : 'Unknown';
-        } else if (status === 'approved') {
-            updateData.approvalDate = new Date().toISOString().split('T')[0];
-            updateData.approvedBy = mainApprover;
-        } else if (status === 'rejected') {
-            updateData.rejectionReason = reason;
-            updateData.rejectedBy = approvalLevel;
-        }
-        
-        let result = { success: false };
-        
-        if (window.airtableService && window.SyncManager && window.SyncManager.isOnline) {
-            result = await window.airtableService.updateExpense(expense.airtableId || expenseId, updateData);
-        }
-        
-        // Update localStorage
-        try {
-            const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
-            const index = localData.findIndex(item => 
-                item.airtableId === expense.airtableId || item.id === expenseId
-            );
-            if (index >= 0) {
-                localData[index] = { ...localData[index], ...updateData };
-                localStorage.setItem('expenseSubmissions', JSON.stringify(localData));
-            }
-        } catch (e) {}
-        
-        window._updatingExpense = false;
-        
-        if (result.success || !window.SyncManager?.isOnline) {
-            alert(`✅ Expense ${status.replace('-', ' ')} successfully!`);
-            loadExpenses();
-        } else {
-            alert(`⚠️ Updated locally. Will sync when online.`);
-            loadExpenses();
-        }
-        
-    } catch (error) {
-        console.error('Error updating expense:', error);
-        window._updatingExpense = false;
-        alert('Error updating expense status.');
+    if (user.role === 'finance') {
+        window.location.href = '/Payment.html';
+        return;
     }
-};
-
-// Override updatePaymentStatus
-window.updatePaymentStatus = async function(expenseId, paymentDate, paymentMethod, paidBy) {
-    try {
-        const expense = allExpenses.find(item => item.id === expenseId);
-        if (!expense) {
-            alert('Expense not found!');
-            return;
-        }
-        
-        const updateData = {
-            paymentStatus: 'paid',
-            paymentDate: paymentDate,
-            paymentMethod: paymentMethod,
-            paidBy: paidBy,
-            status: 'paid',
-            lastUpdated: new Date().toISOString()
-        };
-        
-        window._updatingPayment = true;
-        
-        let result = { success: false };
-        
-        if (window.airtableService && window.SyncManager && window.SyncManager.isOnline) {
-            result = await window.airtableService.updateExpense(expense.airtableId || expenseId, updateData);
-        }
-        
-        // Update localStorage
-        try {
-            const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
-            const index = localData.findIndex(item => 
-                item.airtableId === expense.airtableId || item.id === expenseId
-            );
-            if (index >= 0) {
-                localData[index] = { ...localData[index], ...updateData };
-                localStorage.setItem('expenseSubmissions', JSON.stringify(localData));
-            }
-        } catch (e) {}
-        
-        window._updatingPayment = false;
-        
-        if (result.success || !window.SyncManager?.isOnline) {
-            alert('✅ Payment recorded successfully!');
-            loadExpenses();
-        } else {
-            alert(`⚠️ Payment recorded locally. Will sync when online.`);
-            loadExpenses();
-        }
-        
-    } catch (error) {
-        console.error('Error updating payment:', error);
-        window._updatingPayment = false;
-        alert('Error recording payment.');
+    
+    if (user.role !== 'manager' && user.role !== 'admin') {
+        alert('Halaman ini hanya untuk Manager dan Admin');
+        window.location.href = '/Dashboard.html';
+        return;
     }
-};
+    
+    window.currentUser = user;
+})();
 
-// Fungsi manual sync
-function manualSync() {
-    if (window.SyncManager) {
-        window.SyncManager.manualSync();
-    } else {
-        alert('Sync Manager not available');
-    }
-}
-</script>
-
-<script>
+        // ============================================
+        // GLOBAL VARIABLES
+        // ============================================
         let allExpenses = [];
         let currentTab = 'pending';
-        let currentRole = 'sub-approval'; // 'sub-approval', 'main-approval', 'payment'
-        const mainApprover = 'Achmad Oskar Wiriadidjaja';
+        let currentRole = 'sub-approval';
+        const mainApprover = 'achmad.oskar@biaenergi.com';
         const subApprovers = ['Muhammad Salman', 'Mohammad Rizki', 'Laras Setyowinanti'];
         let isOnline = false;
 
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Approval page loaded - Airtable Version');
-               
-    // Cek URL parameter untuk role
-    const urlParams = new URLSearchParams(window.location.search);
-    const roleParam = urlParams.get('role');
-    
-    if (roleParam === 'main-approval') {
-        setRole('main-approval');
-        // Update active button
-        document.querySelectorAll('.btn-group .btn')[1].classList.add('active');
-        document.querySelectorAll('.btn-group .btn')[0].classList.remove('active');
-    } else if (roleParam === 'sub-approval') {
-        setRole('sub-approval');
+        // ============================================
+        // FUNGSI UTAMA
+        // ============================================
         
-// sub-approval sudah default active
-    }
-            // Update navigation active state
-            const currentPage = window.location.pathname.split('/').pop();
-            document.querySelectorAll('.nav-link').forEach(link => {
-                if (link.getAttribute('href') === currentPage) {
-                    link.classList.add('active');
-                } else {
-                    link.classList.remove('active');
-                }
-            });
-
-            // Test connection first
-            testConnection();
-            
-            // Load expenses
-            loadExpenses();
-            
-            // Auto-refresh every 10 seconds
-            setInterval(loadExpenses, 10000);
-        });
-
-        async function testConnection() {
+        // Load expenses dari API
+        async function loadExpenses() {
             try {
-                document.getElementById('syncBadge').className = 'badge bg-warning';
-                document.getElementById('syncBadge').textContent = 'Testing...';
+                console.log('Loading expenses...');
                 
-                const testData = await window.airtableService.getAllExpenses();
-                isOnline = true;
+                if (window.airtableService) {
+                    allExpenses = await window.airtableService.getAllExpenses();
+                    console.log(`Loaded ${allExpenses.length} expenses`);
+                } else {
+                    console.warn('Airtable service not available');
+                    const localData = localStorage.getItem('expenseSubmissions');
+                    allExpenses = localData ? JSON.parse(localData) : [];
+                }
                 
-                document.getElementById('syncBadge').className = 'badge bg-success';
-                document.getElementById('syncBadge').textContent = 'Online';
-                document.getElementById('dataSourceInfo').textContent = `From Airtable (${testData.length} records)`;
+                updateStatistics();
+                renderTab(currentTab);
                 
-                document.getElementById('connectionBanner').style.display = 'none';
-                
-                return true;
             } catch (error) {
-                isOnline = false;
-                
-                document.getElementById('syncBadge').className = 'badge bg-danger';
-                document.getElementById('syncBadge').textContent = 'Offline';
-                document.getElementById('dataSourceInfo').textContent = 'From Local Storage';
-                
-                document.getElementById('connectionBanner').style.display = 'block';
-                
-                return false;
+                console.error('Error loading expenses:', error);
             }
         }
 
+        // Update statistik di halaman
+// Update statistik di halaman
+function updateStatistics() {
+    let pendingForMe = 0;
+    
+    if (currentUser.role === 'admin') {
+        // Admin lihat semua
+        pendingForMe = allExpenses.filter(item => {
+            const fields = item.fields || item;
+            return fields.status === 'pending' || 
+                   fields.status === 'sub-approved' ||
+                   fields.status === 'pending-main';
+        }).length;
+    }
+    else if (currentUser.role === 'manager') {
+        // MAIN APPROVAL (Oskar) - pakai email
+        if (currentUser.email === mainApprover) {
+            pendingForMe = allExpenses.filter(item => {
+                const fields = item.fields || item;
+                return (fields.status === 'sub-approved') ||
+                       (fields.status === 'pending-main') ||
+                       (fields.status === 'pending' && fields.manager === mainApprover);
+            }).length;
+        } 
+        // SUB APPROVERS (Salman, Rizki, Laras) - pakai nama
+        else {
+            pendingForMe = allExpenses.filter(item => {
+                const fields = item.fields || item;
+                return fields.status === 'pending' && 
+                       subApprovers.includes(fields.manager);
+            }).length;
+        }
+    }
+    
+    document.getElementById('pendingCount').textContent = pendingForMe;
+    document.getElementById('subApprovedCount').textContent = 
+        allExpenses.filter(item => {
+            const fields = item.fields || item;
+            return fields.status === 'sub-approved';
+        }).length;
+    document.getElementById('approvedCount').textContent = 
+        allExpenses.filter(item => {
+            const fields = item.fields || item;
+            return fields.status === 'approved';
+        }).length;
+    document.getElementById('urgentCount').textContent = 
+        allExpenses.filter(item => {
+            const fields = item.fields || item;
+            return fields.urgency === 'critical';
+        }).length;
+}
+
+        // Test koneksi ke API
+        async function testConnection() {
+            try {
+                const badge = document.getElementById('syncBadge');
+                badge.textContent = 'Testing...';
+                
+                if (window.airtableService) {
+                    await window.airtableService.getAllExpenses();
+                    badge.className = 'badge bg-success';
+                    badge.textContent = 'Online';
+                    document.getElementById('connectionBanner').style.display = 'none';
+                    document.getElementById('dataSourceInfo').textContent = 'From Airtable';
+                    isOnline = true;
+                } else {
+                    throw new Error('Airtable service not available');
+                }
+            } catch (error) {
+                document.getElementById('syncBadge').className = 'badge bg-danger';
+                document.getElementById('syncBadge').textContent = 'Offline';
+                document.getElementById('connectionBanner').style.display = 'block';
+                document.getElementById('dataSourceInfo').textContent = 'From Local Storage';
+                isOnline = false;
+            }
+        }
+
+        // Set role (sub-approval / main-approval)
         function setRole(role) {
             currentRole = role;
-            document.querySelectorAll('.btn-group .btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
             
+            // Update tombol active
+            const buttons = document.querySelectorAll('.btn-group .btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            buttons.forEach(btn => {
+                if ((role === 'sub-approval' && btn.textContent.includes('Sub Approval')) ||
+                    (role === 'main-approval' && btn.textContent.includes('Main Approval'))) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // Update teks role
             const roleNames = {
                 'sub-approval': 'Sub Approval (Muhammad Salman, Mohammad Rizki or Laras Setyowinanti)',
-                'main-approval': 'Main Approval (Achmad Oskar Wiriadidjaja)',
-                'payment': 'Payment (Financing)'
+                'main-approval': 'Main Approval (Achmad Oskar Wiriadidjaja)'
             };
             
             document.getElementById('currentRole').textContent = roleNames[role];
             document.getElementById('approvalStatus').textContent = `Role: ${roleNames[role]}`;
             
+            // Reload data
             loadExpenses();
-            renderTab(currentTab);
         }
 
-        async function loadExpenses() {
-            try {
-                console.log('Loading expenses from Airtable...');
-                
-                allExpenses = await window.airtableService.getAllExpenses();
-                console.log(`Loaded ${allExpenses.length} expenses`);
-                
-                // Update statistics based on current role
-                let pendingForMe = 0;
-                const subApproved = allExpenses.filter(item => item.status === 'sub-approved').length;
-                const approved = allExpenses.filter(item => item.status === 'approved').length;
-                const pendingMain = allExpenses.filter(item => item.status === 'pending-main').length;
-                const urgent = allExpenses.filter(item => 
-                    (item.status === 'pending' || item.status === 'pending-main' || item.status === 'sub-approved') && 
-                    item.urgency === 'critical'
-                ).length;
-                
-                // Calculate pending for current role
-                if (currentRole === 'sub-approval') {
-                    pendingForMe = allExpenses.filter(item => 
-                        item.status === 'pending' && 
-                        subApprovers.includes(item.manager)
-                    ).length;
-                } else if (currentRole === 'main-approval') {
-                    pendingForMe = allExpenses.filter(item => 
-                        item.status === 'sub-approved' || item.status === 'pending-main'
-                    ).length;
-                } else if (currentRole === 'payment') {
-                    pendingForMe = allExpenses.filter(item => 
-                        item.status === 'approved' && 
-                        item.paymentStatus !== 'paid'
-                    ).length;
-                }
-                
-                document.getElementById('pendingCount').textContent = pendingForMe;
-                document.getElementById('subApprovedCount').textContent = subApproved;
-                document.getElementById('approvedCount').textContent = approved;
-                document.getElementById('urgentCount').textContent = urgent;
-                
-                // Render current tab
-                renderTab(currentTab);
-                
-            } catch (error) {
-                console.error('Error loading expenses:', error);
-                alert('Error loading expenses. Using local data.');
-            }
-        }
-
+        // Render tab berdasarkan nama tab
         function renderTab(tabName) {
             let filteredExpenses = [];
             
-            switch(tabName) {
-                case 'pending':
-                    if (currentRole === 'sub-approval') {
-                        filteredExpenses = allExpenses.filter(item => 
-                            item.status === 'pending' && 
-                            subApprovers.includes(item.manager)
-                        );
-                    } else if (currentRole === 'main-approval') {
-                        filteredExpenses = allExpenses.filter(item => 
-                            item.status === 'sub-approved' || item.status === 'pending-main'
-                        );
-                    } else if (currentRole === 'payment') {
-                        filteredExpenses = allExpenses.filter(item => 
-                            item.status === 'approved' && 
-                            item.paymentStatus !== 'paid'
-                        );
-                    }
-                    break;
-                case 'sub-approved':
-                    filteredExpenses = allExpenses.filter(item => item.status === 'sub-approved');
-                    break;
-                case 'approved':
-                    filteredExpenses = allExpenses.filter(item => item.status === 'approved');
-                    break;
-                case 'rejected':
-                    filteredExpenses = allExpenses.filter(item => item.status === 'rejected');
-                    break;
-                case 'paid':
-                    filteredExpenses = allExpenses.filter(item => item.paymentStatus === 'paid');
-                    break;
-                case 'all':
-                    filteredExpenses = allExpenses;
-                    break;
+            // Filter berdasarkan tab dan role
+            if (tabName === 'pending') {
+                if (currentRole === 'sub-approval') {
+                    filteredExpenses = allExpenses.filter(item => {
+                        const fields = item.fields || item;
+                        return fields.status === 'pending' && 
+                               subApprovers.includes(fields.manager);
+                    });
+                } else if (currentRole === 'main-approval') {
+                    filteredExpenses = allExpenses.filter(item => {
+                        const fields = item.fields || item;
+                        return (fields.status === 'sub-approved') ||
+                               (fields.status === 'pending-main') ||
+                               (fields.status === 'pending' && fields.manager === mainApprover);
+                    });
+                }
+            } else if (tabName === 'sub-approved') {
+                filteredExpenses = allExpenses.filter(item => {
+                    const fields = item.fields || item;
+                    return fields.status === 'sub-approved';
+                });
+            } else if (tabName === 'approved') {
+                filteredExpenses = allExpenses.filter(item => {
+                    const fields = item.fields || item;
+                    return fields.status === 'approved';
+                });
+            } else if (tabName === 'rejected') {
+                filteredExpenses = allExpenses.filter(item => {
+                    const fields = item.fields || item;
+                    return fields.status === 'rejected';
+                });
+            } else if (tabName === 'paid') {
+                filteredExpenses = allExpenses.filter(item => {
+                    const fields = item.fields || item;
+                    return fields.paymentStatus === 'paid';
+                });
+            } else if (tabName === 'all') {
+                filteredExpenses = allExpenses;
             }
             
-            const container = document.getElementById(tabName === 'sub-approved' ? 'subApprovedList' : tabName + 'List');
+            // Tampilkan ke container
+            const containerId = tabName === 'sub-approved' ? 'subApprovedList' : tabName + 'List';
+            const container = document.getElementById(containerId);
+            
+            if (!container) return;
             
             if (filteredExpenses.length === 0) {
                 container.innerHTML = `
@@ -668,42 +493,43 @@ function manualSync() {
                 document.getElementById('noPending').style.display = 'none';
             }
             
+            // Generate HTML
             let html = '';
             filteredExpenses.forEach(expense => {
-                const statusBadge = getStatusBadge(expense.status, expense.paymentStatus);
+                const fields = expense.fields || expense;
+                const statusBadge = getStatusBadge(fields.status, fields.paymentStatus);
                 const actions = getActionButtons(expense);
-                const approvalFlow = getApprovalFlow(expense);
+                const approvalFlow = getApprovalFlow(fields);
                 
-                // Tentukan jenis approval flow
                 let approvalType = "2-Step Approval";
-                if (expense.manager === mainApprover && expense.status === 'pending-main') {
+                if (fields.manager === mainApprover && fields.status === 'pending-main') {
                     approvalType = "Direct to Main Approval";
                 }
                 
                 html += `
-                    <div class="expense-card ${expense.status}">
+                    <div class="expense-card ${fields.status}">
                         <div class="row">
                             <div class="col-md-8">
-                                <h5>${expense.project}</h5>
-                                <p class="mb-1">${expense.name} • ${expense.division} • ${formatDate(expense.date)}</p>
-                                <p class="text-muted mb-2">${expense.description || ''}</p>
+                                <h5>${fields.project || 'No Project'}</h5>
+                                <p class="mb-1">${fields.employeeName || 'Unknown'} • ${fields.division || '-'} • ${formatDate(fields.expenseDate)}</p>
+                                <p class="text-muted mb-2">${fields.description || ''}</p>
                                 <div class="approval-flow">${approvalFlow}</div>
                                 <p class="mb-0">
                                     <small class="text-muted">
                                         <span class="badge bg-info">${approvalType}</span>
-                                        Manager: ${expense.manager} • 
-                                        Type: ${expense.type === 'cash-advance' ? 'Cash Advance' : 'Reimbursement'}
-                                        ${expense.subApprovedBy ? ` • Sub Approved by: ${expense.subApprovedBy}` : ''}
-                                        ${expense.approvedBy ? ` • Approved by: ${expense.approvedBy}` : ''}
-                                        ${expense.paidBy ? ` • Paid by: ${expense.paidBy}` : ''}
-                                        ${expense.hasAttachment ? ' • <i class="bi bi-paperclip"></i> Bukti Tersedia' : ''}
+                                        Manager: ${fields.manager || '-'} • 
+                                        Type: ${fields.expenseType === 'cash-advance' ? 'Cash Advance' : 'Reimbursement'}
+                                        ${fields.subApprovedBy ? ` • Sub Approved by: ${fields.subApprovedBy}` : ''}
+                                        ${fields.approvedBy ? ` • Approved by: ${fields.approvedBy}` : ''}
+                                        ${fields.paidBy ? ` • Paid by: ${fields.paidBy}` : ''}
+                                        ${fields.hasAttachment ? ' • <i class="bi bi-paperclip"></i> Bukti Tersedia' : ''}
                                     </small>
                                 </p>
                             </div>
                             <div class="col-md-4 text-end">
-                                <h4 class="text-primary">Rp ${formatCurrency(expense.amount)}</h4>
+                                <h4 class="text-primary">Rp ${formatCurrency(fields.amount)}</h4>
                                 <div class="mb-2">${statusBadge}</div>
-                                ${expense.urgency === 'critical' ? '<span class="badge bg-danger">URGENT</span>' : ''}
+                                ${fields.urgency === 'critical' ? '<span class="badge bg-danger">URGENT</span>' : ''}
                                 ${actions}
                             </div>
                         </div>
@@ -714,23 +540,25 @@ function manualSync() {
             container.innerHTML = html;
         }
 
-        function getApprovalFlow(expense) {
+        // ============================================
+        // FUNGSI-FUNGSI PENDUKUNG
+        // ============================================
+        
+        function getApprovalFlow(fields) {
             let steps = [];
             let currentStep = 0;
             
-            if (expense.manager === mainApprover && expense.status === 'pending-main') {
-                // Direct approval flow
+            if (fields.manager === mainApprover && fields.status === 'pending-main') {
                 steps = ['Request', 'Main Approval', 'Payment'];
-                if (expense.status === 'pending-main') currentStep = 1;
-                else if (expense.status === 'approved') currentStep = 2;
-                else if (expense.paymentStatus === 'paid') currentStep = 3;
+                if (fields.status === 'pending-main') currentStep = 1;
+                else if (fields.status === 'approved') currentStep = 2;
+                else if (fields.paymentStatus === 'paid') currentStep = 3;
             } else {
-                // Normal 2-step flow
                 steps = ['Request', 'Sub Approval', 'Main Approval', 'Payment'];
-                if (expense.status === 'pending') currentStep = 1;
-                else if (expense.status === 'sub-approved') currentStep = 2;
-                else if (expense.status === 'approved') currentStep = 3;
-                else if (expense.paymentStatus === 'paid') currentStep = 4;
+                if (fields.status === 'pending') currentStep = 1;
+                else if (fields.status === 'sub-approved') currentStep = 2;
+                else if (fields.status === 'approved') currentStep = 3;
+                else if (fields.paymentStatus === 'paid') currentStep = 4;
             }
             
             let html = '';
@@ -738,7 +566,6 @@ function manualSync() {
                 let stepClass = '';
                 if (i < currentStep) stepClass = 'completed';
                 else if (i === currentStep) stepClass = 'active';
-                
                 html += `<span class="step ${stepClass}">${steps[i]}</span>`;
             }
             return html;
@@ -748,7 +575,6 @@ function manualSync() {
             if (paymentStatus === 'paid') {
                 return '<span class="status-badge badge-paid">Paid</span>';
             }
-            
             switch(status) {
                 case 'pending': return '<span class="status-badge badge-pending">Pending Sub Approval</span>';
                 case 'pending-main': return '<span class="status-badge badge-pending" style="background:#e67e22;color:white;">Pending Main Approval</span>';
@@ -759,36 +585,39 @@ function manualSync() {
             }
         }
 
-        function getActionButtons(expense) {
-            let buttons = '';
-            
-            if (currentRole === 'sub-approval' && expense.status === 'pending' && subApprovers.includes(expense.manager)) {
-                buttons = `
-                    <div class="mt-2">
-                        <button class="btn btn-sm btn-sub-approve me-2" onclick="subApproveExpense('${expense.id}')">
-                            <i class="bi bi-check"></i> Sub Approve
-                        </button>
-                        <button class="btn btn-sm btn-reject" onclick="rejectExpense('${expense.id}')">
-                            <i class="bi bi-x"></i> Reject
-                        </button>
-                    </div>
-                `;
-            } else if (currentRole === 'main-approval' && (expense.status === 'sub-approved' || expense.status === 'pending-main')) {
+function getActionButtons(expense) {
+    const fields = expense.fields || expense;
+    let buttons = '';
+    
+    // ADMIN - bisa semua
+    if (currentUser.role === 'admin') {
+        buttons = `
+            <div class="mt-2">
+                <button class="btn btn-sm btn-sub-approve me-1" onclick="subApproveExpense('${expense.id}')" title="Sub Approve">
+                    <i class="bi bi-check"></i> Sub
+                </button>
+                <button class="btn btn-sm btn-approve me-1" onclick="mainApproveExpense('${expense.id}')" title="Main Approve">
+                    <i class="bi bi-check-circle"></i> Main
+                </button>
+                <button class="btn btn-sm btn-reject" onclick="rejectExpense('${expense.id}')" title="Reject">
+                    <i class="bi bi-x-circle"></i> Reject
+                </button>
+            </div>
+        `;
+    } 
+    // MANAGER
+    else if (currentUser.role === 'manager') {
+        // CEK APAKAH MAIN APPROVER (Oskar) - pakai email
+        if (currentUser.email === mainApprover) {
+            // Oskar: hanya bisa approve yang sub-approved atau pending-main
+            if (fields.status === 'sub-approved' || fields.status === 'pending-main') {
                 buttons = `
                     <div class="mt-2">
                         <button class="btn btn-sm btn-approve me-2" onclick="mainApproveExpense('${expense.id}')">
-                            <i class="bi bi-check-circle"></i> ${expense.status === 'pending-main' ? 'Direct Approve' : 'Final Approve'}
+                            <i class="bi bi-check-circle"></i> Final Approve
                         </button>
                         <button class="btn btn-sm btn-reject" onclick="rejectExpense('${expense.id}')">
                             <i class="bi bi-x-circle"></i> Reject
-                        </button>
-                    </div>
-                `;
-            } else if (currentRole === 'payment' && expense.status === 'approved' && expense.paymentStatus !== 'paid') {
-                buttons = `
-                    <div class="mt-2">
-                        <button class="btn btn-sm btn-success" onclick="markAsPaid('${expense.id}')">
-                            <i class="bi bi-credit-card"></i> Mark as Paid
                         </button>
                     </div>
                 `;
@@ -799,10 +628,49 @@ function manualSync() {
                     </button>
                 `;
             }
+        } 
+        // SUB-APPROVERS (Salman, Rizki, Laras) - pakai nama
+        else {
+            // CEK: Apakah expense ini untuk manager ini?
+            const isMyExpense = fields.status === 'pending' && 
+                               fields.manager === currentUser.name;
             
-            return buttons;
+            if (isMyExpense) {
+                buttons = `
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-sub-approve me-2" onclick="subApproveExpense('${expense.id}')">
+                            <i class="bi bi-check"></i> Sub Approve
+                        </button>
+                        <button class="btn btn-sm btn-reject" onclick="rejectExpense('${expense.id}')">
+                            <i class="bi bi-x"></i> Reject
+                        </button>
+                    </div>
+                `;
+            } else {
+                buttons = `
+                    <button class="btn btn-sm btn-outline-secondary mt-2" onclick="viewExpense('${expense.id}')">
+                        <i class="bi bi-eye"></i> View Details
+                    </button>
+                `;
+            }
         }
+    } 
+    // EMPLOYEE - hanya bisa lihat
+    else {
+        buttons = `
+            <button class="btn btn-sm btn-outline-secondary mt-2" onclick="viewExpense('${expense.id}')">
+                <i class="bi bi-eye"></i> View Details
+            </button>
+        `;
+    }
+    
+    return buttons;
+}
 
+        // ============================================
+        // FUNGSI APPROVAL
+        // ============================================
+        
         async function subApproveExpense(expenseId) {
             if (confirm('Approve this expense at sub-approval level?')) {
                 await updateExpenseStatus(expenseId, 'sub-approved', '', 'Sub Approval');
@@ -822,58 +690,67 @@ function manualSync() {
             }
         }
 
-        async function markAsPaid(expenseId) {
-            const expense = allExpenses.find(item => item.id === expenseId);
-            if (!expense) {
-                alert('Expense not found!');
-                return;
-            }
-            
-            if (confirm(`Mark expense as paid?\n\nProject: ${expense.project}\nAmount: Rp ${formatCurrency(expense.amount)}`)) {
-                const paymentDate = prompt('Enter payment date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
-                const paymentMethod = prompt('Enter payment method:', expense.paymentMethod || 'Bank Transfer');
-                const paidBy = prompt('Enter processor name:', 'Financing Department');
-                
-                if (paymentDate && paymentMethod && paidBy) {
-                    await updatePaymentStatus(expenseId, paymentDate, paymentMethod, paidBy);
+        async function updateExpenseStatus(expenseId, status, reason = '', approvalLevel = '') {
+            try {
+                const expense = allExpenses.find(item => item.id === expenseId);
+                if (!expense) {
+                    alert('Expense not found!');
+                    return;
                 }
-            }
-        }
-
-async function updateExpenseStatus(expenseId, status, reason = '', approvalLevel = '') {
-    try {
-        const expense = allExpenses.find(item => item.id === expenseId);
-        if (!expense) {
-            alert('Expense not found!');
-            return;
-        }
-        
-        const updateData = {
-            status: status,
-            // Gunakan format YYYY-MM-DD
-            lastUpdated: new Date().toISOString().split('T')[0]
-        };
-        
-        if (status === 'sub-approved') {
-            updateData.subApprovedDate = new Date().toISOString().split('T')[0];
-            updateData.subApprovedBy = currentRole === 'sub-approval' ? expense.manager : 'Unknown';
-        } else if (status === 'approved') {
-            updateData.approvalDate = new Date().toISOString().split('T')[0];
-            updateData.approvedBy = mainApprover;
-        } else if (status === 'rejected') {
-            updateData.rejectionReason = reason;
-            updateData.rejectedBy = approvalLevel;
-        }
-              
-                // Update in Airtable
-                const result = await window.airtableService.updateExpense(expenseId, updateData);
                 
-                if (result.success) {
+                const fields = expense.fields || expense;  
+         
+                // VALIDASI - Cek apakah user berhak
+                if (status === 'sub-approved' && currentRole !== 'sub-approval') {
+                    alert('Anda tidak berhak melakukan sub-approval!');
+                    return;
+                }
+                
+                if (status === 'approved' && currentRole !== 'main-approval') {
+                    alert('Anda tidak berhak melakukan main approval!');
+                    return;
+                }
+               
+                const updateData = {
+                    status: status,
+                    lastUpdated: new Date().toISOString().split('T')[0]
+                };
+                
+                if (status === 'sub-approved') {
+                    updateData.subApprovedDate = new Date().toISOString().split('T')[0];
+                    updateData.subApprovedBy = currentRole === 'sub-approval' ? fields.manager : 'Unknown';
+                } else if (status === 'approved') {
+                    updateData.approvalDate = new Date().toISOString().split('T')[0];
+                    updateData.approvedBy = mainApprover;
+                } else if (status === 'rejected') {
+                    updateData.rejectionReason = reason;
+                    updateData.rejectedBy = approvalLevel;
+                }
+                
+                let result = { success: false };
+                
+                if (window.airtableService && isOnline) {
+                    result = await window.airtableService.updateExpense(expense.airtableId || expenseId, updateData);
+                }
+                
+                // Update localStorage
+                try {
+                    const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
+                    const index = localData.findIndex(item => 
+                        item.airtableId === expense.airtableId || item.id === expenseId
+                    );
+                    if (index >= 0) {
+                        localData[index] = { ...localData[index], ...updateData };
+                        localStorage.setItem('expenseSubmissions', JSON.stringify(localData));
+                    }
+                } catch (e) {}
+                
+                if (result.success || !isOnline) {
                     alert(`✅ Expense ${status.replace('-', ' ')} successfully!`);
-                    loadExpenses();
+                    await loadExpenses();
                 } else {
-                    alert(`⚠️ Updated locally. Airtable error: ${result.error}`);
-                    loadExpenses();
+                    alert(`⚠️ Updated locally. Will sync when online.`);
+                    await loadExpenses();
                 }
                 
             } catch (error) {
@@ -882,92 +759,92 @@ async function updateExpenseStatus(expenseId, status, reason = '', approvalLevel
             }
         }
 
-        async function updatePaymentStatus(expenseId, paymentDate, paymentMethod, paidBy) {
-            try {
-                const updateData = {
-                    paymentStatus: 'paid',
-                    paymentDate: paymentDate,
-                    paymentMethod: paymentMethod,
-                    paidBy: paidBy,
-                    status: 'paid',
-                    lastUpdated: new Date().toISOString()
-                };
-                
-                // Update in Airtable
-                const result = await window.airtableService.updateExpense(expenseId, updateData);
-                
-                if (result.success) {
-                    alert('✅ Payment recorded successfully!\n\nExpense marked as PAID.');
-                    loadExpenses();
-                } else {
-                    alert(`⚠️ Payment recorded locally. Airtable error: ${result.error}`);
-                    loadExpenses();
-                }
-                
-            } catch (error) {
-                console.error('Error updating payment:', error);
-                alert('Error recording payment.');
-            }
-        }
-
         function viewExpense(expenseId) {
             const expense = allExpenses.find(item => item.id === expenseId);
             if (expense) {
+                const fields = expense.fields || expense;
+                
                 let details = `Expense Details:\n\n` +
                       `ID: ${expense.id}\n` +
-                      `Project: ${expense.project}\n` +
-                      `Employee: ${expense.name}\n` +
-                      `Division: ${expense.division}\n` +
-                      `Amount: Rp ${formatCurrency(expense.amount)}\n` +
-                      `Status: ${expense.status}\n` +
-                      `Payment Status: ${expense.paymentStatus || 'Not paid'}\n` +
-                      `Manager: ${expense.manager}\n`;
+                      `Project: ${fields.project || 'N/A'}\n` +
+                      `Employee: ${fields.employeeName || 'Unknown'}\n` +
+                      `Division: ${fields.division || '-'}\n` +
+                      `Amount: Rp ${formatCurrency(fields.amount || 0)}\n` +
+                      `Status: ${fields.status || 'Unknown'}\n` +
+                      `Payment Status: ${fields.paymentStatus || 'Not paid'}\n` +
+                      `Manager: ${fields.manager || '-'}\n`;
                 
-                if (expense.subApprovedBy) {
-                    details += `Sub Approved by: ${expense.subApprovedBy} on ${expense.subApprovedDate}\n`;
+                if (fields.subApprovedBy) {
+                    details += `Sub Approved by: ${fields.subApprovedBy} on ${fields.subApprovedDate}\n`;
                 }
-                if (expense.approvedBy) {
-                    details += `Approved by: ${expense.approvedBy} on ${expense.approvalDate}\n`;
+                if (fields.approvedBy) {
+                    details += `Approved by: ${fields.approvedBy} on ${fields.approvalDate}\n`;
                 }
-                if (expense.rejectionReason) {
-                    details += `Rejection Reason: ${expense.rejectionReason}\n`;
+                if (fields.rejectionReason) {
+                    details += `Rejection Reason: ${fields.rejectionReason}\n`;
                 }
-                details += `Description: ${expense.description || 'No description'}`;
+                details += `Description: ${fields.description || 'No description'}`;
                 
                 alert(details);
             }
         }
 
+        // ============================================
+        // FUNGSI UTILITY
+        // ============================================
+        
         async function refreshData() {
+            await testConnection();
             await loadExpenses();
             alert('Data refreshed!');
         }
 
         function showTab(tabName) {
             currentTab = tabName;
-            // Hide all tabs
+            
+            // Sembunyikan semua tab
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.style.display = 'none';
             });
-            // Show selected tab
+            
+            // Tampilkan tab yang dipilih
             document.getElementById(tabName + 'Tab').style.display = 'block';
             
-            // Update nav links active state
+            // Update active class di nav
             document.querySelectorAll('.nav-tabs .nav-link').forEach(link => {
                 link.classList.remove('active');
             });
             event.target.classList.add('active');
             
+            // Render tab
             renderTab(tabName);
         }
 
         function checkData() {
-            const pending = allExpenses.filter(item => item.status === 'pending').length;
-            const pendingMain = allExpenses.filter(item => item.status === 'pending-main').length;
-            const subApproved = allExpenses.filter(item => item.status === 'sub-approved').length;
-            const approved = allExpenses.filter(item => item.status === 'approved').length;
-            const paid = allExpenses.filter(item => item.paymentStatus === 'paid').length;
-            const rejected = allExpenses.filter(item => item.status === 'rejected').length;
+            const pending = allExpenses.filter(item => {
+                const fields = item.fields || item;
+                return fields.status === 'pending';
+            }).length;
+            const pendingMain = allExpenses.filter(item => {
+                const fields = item.fields || item;
+                return fields.status === 'pending-main';
+            }).length;
+            const subApproved = allExpenses.filter(item => {
+                const fields = item.fields || item;
+                return fields.status === 'sub-approved';
+            }).length;
+            const approved = allExpenses.filter(item => {
+                const fields = item.fields || item;
+                return fields.status === 'approved';
+            }).length;
+            const paid = allExpenses.filter(item => {
+                const fields = item.fields || item;
+                return fields.paymentStatus === 'paid';
+            }).length;
+            const rejected = allExpenses.filter(item => {
+                const fields = item.fields || item;
+                return fields.status === 'rejected';
+            }).length;
             
             alert(`Approval System Data:\n\n` +
                   `Total Expenses: ${allExpenses.length}\n` +
@@ -995,6 +872,38 @@ async function updateExpenseStatus(expenseId, status, reason = '', approvalLevel
                 return dateString;
             }
         }
+
+        // ============================================
+        // INITIALIZATION - DIJALANKAN SAAT HALAMAN LOAD
+        // ============================================
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Approval page loaded');
+            
+            // Cek URL parameter untuk role
+            const urlParams = new URLSearchParams(window.location.search);
+            const roleParam = urlParams.get('role');
+            
+            if (roleParam === 'main-approval') {
+                setRole('main-approval');
+            } else {
+                setRole('sub-approval');
+            }
+            
+            // Update active nav
+            const currentPage = window.location.pathname.split('/').pop();
+            document.querySelectorAll('.nav-link').forEach(link => {
+                if (link.getAttribute('href') === currentPage) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+
+            // Test koneksi dan load data
+            testConnection();
+            loadExpenses();
+        });
+
     </script>
 </body>
 </html>

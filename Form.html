@@ -16,6 +16,10 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             padding: 20px;
         }
+        .navbar-nav .nav-link.active {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 5px;
+        }
         .form-container {
             max-width: 800px;
             margin: 0 auto;
@@ -174,18 +178,18 @@
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="form-label required">Expense Category</label>
-                        <select class="form-select" id="expenseCategory" required>
-                            <option value="">Select Category</option>
-                            <option value="travel">Travel & Accommodation</option>
-                            <option value="meals">Meals & Entertainment</option>
-                            <option value="office-supplies">Office Supplies</option>
-                            <option value="software">Software & Subscriptions</option>
-                            <option value="hardware">Hardware & Equipment</option>
-                            <option value="training">Training & Development</option>
-                            <option value="marketing">Marketing & Advertising</option>
-                            <option value="utilities">Utilities & Services</option>
-                            <option value="other">Other</option>
-                        </select>
+<select class="form-select" id="expenseCategory" required>
+    <option value="">Select Category</option>
+    <option value="travel & accommodation">Travel & Accommodation</option>
+    <option value="meal & entertainment">Meals & Entertainment</option>
+    <option value="office-supplies">Office Supplies</option>
+    <option value="software & subscription">Software & Subscriptions</option>
+    <option value="hardware & equipment">Hardware & Equipment</option>
+    <option value="training & development">Training & Development</option>  <!-- INI YANG DIPERBAIKI -->
+    <option value="marketing & advertising">Marketing & Advertising</option>
+    <option value="utilities & services">Utilities & Services</option>
+    <option value="other">Other</option>
+</select>                        
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label required">Project/Item Name</label>
@@ -243,7 +247,7 @@
                             <option value="">Select Method</option>
                             <option value="bank-transfer">Bank Transfer</option>
                             <option value="payroll">Payroll Deduction</option>
-                            <option value="virtual-account">Virtual Account</option>
+                            <option value="virtual account">Virtual Account</option>
                             <option value="e-wallet">E-Wallet</option>
                             <option value="cash">Cash</option>
                         </select>
@@ -293,6 +297,37 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     
 <script>
+const user = JSON.parse(sessionStorage.getItem('user'));
+if (!user) {
+    window.location.href = '/login.html';
+}
+// Semua role bisa akses form
+console.log('User role:', user.role);
+
+// Auto-fill form dengan data user
+document.addEventListener('DOMContentLoaded', function() {
+    // Isi nama employee
+    const nameField = document.getElementById('employeeName');
+    if (nameField && user.name) {
+        nameField.value = user.name;
+        nameField.readOnly = true;
+        nameField.classList.add('bg-light');
+    }
+    
+    // Isi division
+    const divisionField = document.getElementById('division');
+    if (divisionField && user.division) {
+        divisionField.value = user.division;
+        divisionField.readOnly = true;
+        divisionField.classList.add('bg-light');
+    }
+    
+    // Update managers dropdown
+    if (typeof updateManagers === 'function') {
+        updateManagers();
+    }
+});
+
 // Global variables
 const validSubApprovers = ['Muhammad Salman', 'Mohammad Rizki', 'Laras Setyowinanti'];
 const mainApprover = 'Achmad Oskar Wiriadidjaja';
@@ -329,6 +364,24 @@ document.addEventListener('DOMContentLoaded', function() {
         autoFillForm();
     }
 });
+    
+// Tambahkan fungsi ini di Form.html
+function validateExpenseData(data) {
+    const validDivisions = ["Service Delivery", "Product Development", "Business Administration"];
+    const validManagers = ["Muhammad Salman", "Mohammad Rizki", "Laras Setyowinanti", "Achmad Oskar Wiriadidjaja"];
+    
+    if (!validDivisions.includes(data.division)) {
+        alert(`Division "${data.division}" tidak valid. Pilih: ${validDivisions.join(', ')}`);
+        return false;
+    }
+    
+    if (!validManagers.includes(data.manager)) {
+        alert(`Manager "${data.manager}" tidak valid.`);
+        return false;
+    }
+    
+    return true;
+}
 
 // Update function to show all managers
 function updateManagers() {
@@ -389,154 +442,73 @@ async function testAirtableConnection() {
         return false;
     }
 }
-
+       
+// Form.html - Bagian submitForm yang benar (ganti dengan ini):
+// Form.html - Bagian submitForm dengan DEBUG
 async function submitForm() {
+    console.log('🚀 ===== SUBMIT FORM DIMULAI =====');
+    
     if (!validateForm()) {
-        alert('Please fill all required fields correctly!');
+        console.log('❌ Validasi form gagal');
         return;
     }
+    console.log('✅ Validasi form berhasil');
     
-    const manager = document.getElementById('managerName').value;
-    const validManagers = [...validSubApprovers, mainApprover];
+    // Ambil data dari form
+    const expenseData = {
+        employeeName: document.getElementById('employeeName')?.value,
+        division: document.getElementById('division')?.value,
+        manager: document.getElementById('managerName')?.value,
+        expenseDate: document.getElementById('date')?.value,
+        expenseType: document.getElementById('type')?.value,
+        category: document.getElementById('expenseCategory')?.value,
+        project: document.getElementById('project')?.value,
+        description: document.getElementById('description')?.value,
+        amount: parseFloat(document.getElementById('amount')?.value || 0),
+        paymentMethod: document.getElementById('paymentMethod')?.value,
+        urgency: document.getElementById('urgency')?.value
+    };
     
-    if (!validManagers.includes(manager)) {
-        alert('Please select a valid approver.');
+    console.log('📦 Data dari form:', JSON.stringify(expenseData, null, 2));
+    
+    // Validasi nilai tambahan
+    if (!validateExpenseData(expenseData)) {
+        console.log('❌ Validasi expense data gagal');
         return;
     }
+    console.log('✅ Validasi expense data berhasil');
     
-    // Show loading state
+    // Show loading
     const submitBtn = document.querySelector('.btn-submit');
     const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Submitting...';
     submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Submitting...';
+    
+    console.log('📤 Mengirim ke API:', JSON.stringify(expenseData, null, 2));
+    console.log('🔍 API function:', window.airtableService.createExpense);
     
     try {
-        // Determine approval flow based on selected manager
-        let approvalFlow = [];
-        let nextStatus = '';
-        
-        if (manager === mainApprover) {
-            // Direct to main approval (skip sub-approval)
-            approvalFlow = ['Submitted', 'Pending Main Approval'];
-            nextStatus = 'pending-main';
-        } else {
-            // Normal flow with sub-approval first
-            approvalFlow = ['Submitted', 'Pending Sub-Approval', 'Pending Main Approval'];
-            nextStatus = 'pending';
-        }
-        
-        // Handle file attachment
-        const fileInput = document.getElementById('attachment');
-        let hasAttachment = false;
-        
-        if (!document.getElementById('noAttachment').checked && fileInput.files.length > 0) {
-            const file = fileInput.files[0];
-            
-            // Validate file size (5MB max)
-            if (file.size > 5 * 1024 * 1024) {
-                alert('File size exceeds 5MB limit. Please compress or choose a smaller file.');
-                submitBtn.innerHTML = originalText;
-                submitBtn.disabled = false;
-                return;
-            }
-            
-            hasAttachment = true;
-        }
-        
-        // Create expense object
-        const expenseData = {
-            date: document.getElementById('date').value,
-            name: document.getElementById('employeeName').value,
-            division: document.getElementById('division').value,
-            manager: manager,
-            type: document.getElementById('type').value,
-            category: document.getElementById('expenseCategory').value,
-            project: document.getElementById('project').value,
-            description: document.getElementById('description').value,
-            amount: parseFloat(document.getElementById('amount').value),
-            paymentMethod: document.getElementById('paymentMethod').value,
-            urgency: document.getElementById('urgency').value,
-            hasAttachment: hasAttachment,
-            status: nextStatus,
-            approvalFlow: approvalFlow,
-            paymentStatus: 'pending',
-            submittedDate: new Date().toISOString(),
-            lastUpdated: new Date().toISOString()
-        };
-        
-        console.log('Submitting expense to Airtable:', expenseData);
-        
-        // Kirim ke Airtable
         const result = await window.airtableService.createExpense(expenseData);
+        console.log('📥 Response dari API:', JSON.stringify(result, null, 2));
         
-        if (result.success) {
-            let message = `✅ Expense Submitted Successfully!\n\n` +
-                  `ID: ${result.recordId}\n` +
-                  `Employee: ${expenseData.name}\n` +
-                  `Project: ${expenseData.project}\n` +
-                  `Amount: Rp ${expenseData.amount.toLocaleString('id-ID')}\n` +
-                  `Approver: ${expenseData.manager}\n`;
-            
-            if (manager === mainApprover) {
-                message += `\n📋 Approval Flow: Direct to Main Approval\n` +
-                           `Status: Pending Main Approval (Achmad Oskar)\n` +
-                           `Next: Achmad Oskar → Financing`;
-            } else {
-                message += `\n📋 Approval Flow: 2-Step Process\n` +
-                           `Status: Pending Sub-Approval\n` +
-                           `Next: ${expenseData.manager} → Achmad Oskar → Financing`;
-            }
-            
-            message += `\n\n📎 Attachment: ${expenseData.hasAttachment ? 'Uploaded' : 'None'}`;
-            message += `\n🌐 Status: ${isOnline ? 'Saved to Airtable' : 'Saved locally (offline)'}`;
-            
-            alert(message);
-            
-            // Clear form
-            const form = document.querySelector('form');
-            if (form) {
-                form.reset();
-            }
-            document.getElementById('date').valueAsDate = new Date();
-            
-            // ✅ REDIRECT KE APPROVAL.HTML (bukan Dashboard)
-            setTimeout(() => {
-                if (manager === mainApprover) {
-                    // Direct to main approval
-                    window.location.href = 'Approval.html?role=main-approval';
-                } else {
-                    // Need sub approval
-                    window.location.href = 'Approval.html?role=sub-approval';
-                }
-            }, 1000);
-            
+        if (result && result.success) {
+            console.log('✅ Submit sukses!');
+            alert('✅ Expense berhasil disimpan!');
+            window.location.href = 'Dashboard.html';
         } else {
-            alert(`⚠️ Submitted with fallback\n\nExpense saved locally. Airtable error: ${result.error}\n\nYou can continue working offline.`);
-            
-            // Clear form
-            const form = document.querySelector('form');
-            if (form) {
-                form.reset();
-            }
-            document.getElementById('date').valueAsDate = new Date();
-            
-            // ✅ REDIRECT KE APPROVAL.HTML (bukan Dashboard)
-            setTimeout(() => {
-                if (manager === mainApprover) {
-                    window.location.href = 'Approval.html?role=main-approval';
-                } else {
-                    window.location.href = 'Approval.html?role=sub-approval';
-                }
-            }, 1000);
+            console.error('❌ Submit gagal:', result);
+            alert('❌ Gagal: ' + (result?.error || 'Unknown error'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
         }
-        
     } catch (error) {
-        console.error('Error submitting form:', error);
-        alert('❌ Error submitting expense. Please try again.');
-        
-        submitBtn.innerHTML = originalText;
+        console.error('❌ Exception:', error);
+        alert('❌ Error: ' + error.message);
         submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
     }
+    
+    console.log('🏁 ===== SUBMIT FORM SELESAI =====');
 }
 
 function validateForm() {
@@ -647,7 +619,7 @@ function autoFillForm() {
     
     document.getElementById('date').value = new Date().toISOString().split('T')[0];
     document.getElementById('type').value = 'reimbursement';
-    document.getElementById('expenseCategory').value = 'meals';
+    document.getElementById('expenseCategory').value = 'meal & entertainment';
     document.getElementById('project').value = 'Client Meeting';
     document.getElementById('description').value = 'Business lunch with important client';
     document.getElementById('amount').value = '500000';

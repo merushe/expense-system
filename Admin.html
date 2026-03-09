@@ -13,6 +13,14 @@
     <script src="api.js"></script>
 
 <script>
+const user = JSON.parse(sessionStorage.getItem('user'));
+if (!user) {
+    window.location.href = '/login.html';
+}
+if (user.role !== 'admin') {
+    console.log('Akses ditolak, redirect ke login');
+    window.location.href = '/login.html';
+}
 // Fallback jika api.js gagal load
 window.addEventListener('error', function(e) {
     if (e.target.tagName === 'SCRIPT' && e.target.src.includes('api.js')) {
@@ -26,261 +34,168 @@ window.addEventListener('error', function(e) {
     }
 }, true);
 </script>
-<style>
-    body {
-        background-color: #f8f9fa;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    .navbar {
-        background: linear-gradient(135deg, #2c3e50 0%, #1a2530 100%);
-        margin-bottom: 20px;  /* <-- DIPERKECIL */
-    }
-    .navbar-nav .nav-link.active {
-        background-color: rgba(255,255,255,0.2);
-        border-radius: 5px;
-    }
-    
-    /* ===== STATISTICS CARDS - LEBIH COMPACT ===== */
-    .stat-card {
-        background: white;
-        border-radius: 8px;
-        padding: 12px 15px;  /* <-- DIPERKECIL dari 20px */
-        margin-bottom: 15px;  /* <-- DIPERKECIL dari 20px */
-        box-shadow: 0 2px 4px rgba(0,0,0,0.03);  /* <-- LEBIH RINGAN */
-        border-left: 4px solid #3498db;  /* <-- DIPERKECIL dari 5px */
-        transition: all 0.2s;
-    }
-    .stat-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-    }
-    .stat-card.pending { border-left-color: #f39c12; }
-    .stat-card.pending-main { border-left-color: #e67e22; }
-    .stat-card.sub-approved { border-left-color: #3498db; }
-    .stat-card.approved { border-left-color: #2ecc71; }
-    .stat-card.paid { border-left-color: #9b59b6; }
-    .stat-card.rejected { border-left-color: #e74c3c; }
-    
-    .stat-value {
-        font-size: 24px;  /* <-- DIPERKECIL dari 32px */
-        font-weight: bold;
-        color: #2c3e50;
-        line-height: 1.2;
-    }
-    .stat-label {
-        font-size: 13px;  /* <-- DIPERKECIL */
-        margin-bottom: 2px;
-    }
-    .stat-card small {
-        font-size: 11px;
-    }
-    
-    /* ===== MODULE CARDS ===== */
-    .module-card {
-        background: white;
-        border-radius: 8px;
-        padding: 15px;  /* <-- DIPERKECIL dari 25px */
-        margin-bottom: 15px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.03);
-        transition: transform 0.2s;
-        height: 100%;
-    }
-    .module-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-    }
-    .module-icon {
-        font-size: 32px;  /* <-- DIPERKECIL dari 40px */
-        margin-bottom: 8px;
-    }
-    
-    /* ===== RECENT EXPENSES TABLE - LEBIH PADAT ===== */
-    .recent-table {
-        background: white;
-        border-radius: 8px;
-        padding: 15px;  /* <-- DIPERKECIL dari 20px */
-        box-shadow: 0 2px 4px rgba(0,0,0,0.03);
-    }
-    .recent-table h4 {
-        font-size: 1.1rem;  /* <-- DIPERKECIL */
-        margin-bottom: 0;
-    }
-    .recent-table .btn-group-sm .btn {
-        padding: 3px 8px;
-        font-size: 11px;
-    }
-    
-    /* ===== STATUS BADGES ===== */
-    .status-badge {
-        padding: 3px 8px;  /* <-- DIPERKECIL dari 5px 10px */
-        border-radius: 12px;
-        font-size: 11px;  /* <-- DIPERKECIL dari 12px */
-        font-weight: 600;
-        display: inline-block;
-    }
-    .badge-pending { background: #fff3cd; color: #856404; }
-    .badge-pending-main { background: #e67e22; color: white; }
-    .badge-sub-approved { background: #cce5ff; color: #004085; }
-    .badge-approved { background: #d4edda; color: #155724; }
-    .badge-paid { background: #2ecc71; color: white; }
-    .badge-rejected { background: #f8d7da; color: #721c24; }
-    
-    /* ===== CHARTS ===== */
-    .chart-container {
-        position: relative;
-        height: 250px;  /* <-- DIPERKECIL dari 300px */
-        width: 100%;
-    }
-    .card {
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.03);
-        margin-bottom: 15px;
-    }
-    .card-header {
-        background: #f8f9fa;
-        border-bottom: 1px solid #eee;
-        padding: 10px 15px;  /* <-- DIPERKECIL */
-    }
-    .card-header h5 {
-        font-size: 1rem;
-        margin-bottom: 0;
-    }
-    .card-body {
-        padding: 15px;  /* <-- DIPERKECIL */
-    }
-    
-    /* ===== TABEL ===== */
-    .table {
-        margin-bottom: 0;
-        font-size: 0.85rem;  /* <-- DIPERKECIL */
-    }
-    .table th {
-        padding: 8px 5px;  /* <-- DIPERKECIL */
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: #555;
-    }
-    .table td {
-        padding: 8px 5px;  /* <-- DIPERKECIL */
-        vertical-align: middle;
-    }
-    .amount-cell {
-        text-align: right;
-        font-family: 'Courier New', monospace;
-        font-size: 12px;
-        white-space: nowrap;
-    }
-    
-    /* ===== APPROVAL FLOW ===== */
-    .approval-flow {
-        font-size: 10px;  /* <-- DIPERKECIL */
-        margin-top: 3px;
-    }
-    .approval-flow .step {
-        display: inline-block;
-        padding: 2px 5px;  /* <-- DIPERKECIL */
-        border-radius: 8px;
-        margin-right: 2px;
-        background: #eee;
-        font-size: 9px;
-    }
-    .approval-flow .step.active {
-        background: #f39c12;
-        color: white;
-    }
-    .approval-flow .step.completed {
-        background: #2ecc71;
-        color: white;
-    }
-    
-    /* ===== ALERTS ===== */
-    .dashboard-alert {
-        border-left: 3px solid #3498db;  /* <-- DIPERKECIL */
-        padding-left: 12px;
-        margin-bottom: 15px;
-    }
-    .dashboard-alert h6 {
-        font-size: 0.9rem;
-        margin-bottom: 2px;
-    }
-    
-    /* ===== DROPDOWN ===== */
-    .dropdown-menu {
-        background-color: #2c3e50;
-        border: none;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-        padding: 5px 0;
-        font-size: 0.85rem;
-    }
-    .dropdown-item {
-        color: white;
-        padding: 6px 15px;
-        transition: all 0.2s;
-    }
-    .dropdown-item:hover {
-        background-color: #34495e;
-        color: white;
-    }
-    .dropdown-item.text-danger:hover {
-        background-color: #c0392b;
-    }
-    #userName {
-        color: white;
-        font-weight: 500;
-        font-size: 0.9rem;
-    }
-    
-    /* ===== QUICK ACTIONS ===== */
-    .quick-action-btn {
-        padding: 8px;
-    }
-    .quick-action-btn .rounded-circle {
-        width: 40px;
-        height: 40px;
-        padding: 8px !important;
-    }
-    .quick-action-btn h6 {
-        font-size: 0.8rem;
-        margin-top: 5px;
-    }
-    .quick-action-btn small {
-        font-size: 0.7rem;
-    }
-    
-    /* ===== SYSTEM OVERVIEW ===== */
-    .workflow-icon {
-        width: 45px !important;  /* <-- DIPERKECIL dari 60px */
-        height: 45px !important;
-    }
-    .workflow-icon i {
-        font-size: 1.2rem;
-    }
-    .workflow-text h6 {
-        font-size: 0.85rem;
-        margin-top: 5px;
-    }
-    .workflow-text p {
-        font-size: 0.7rem;
-        margin-bottom: 2px;
-    }
-    
-    /* ===== DEBUG SECTION ===== */
-    .debug-section .btn-sm {
-        padding: 3px 8px;
-        font-size: 0.75rem;
-        margin-bottom: 5px;
-    }
-    .debug-section h6 {
-        font-size: 0.9rem;
-    }
-    
-    /* Utility classes */
-    .text-muted-small {
-        font-size: 0.75rem;
-        color: #6c757d;
-    }
-</style>
 
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #2c3e50 0%, #1a2530 100%);
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-left: 5px solid #3498db;
+            transition: transform 0.3s;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+        }
+        .stat-card.pending { border-left-color: #f39c12; }
+        .stat-card.pending-main { border-left-color: #e67e22; }
+        .stat-card.sub-approved { border-left-color: #3498db; }
+        .stat-card.approved { border-left-color: #2ecc71; }
+        .stat-card.paid { border-left-color: #9b59b6; }
+        .stat-card.rejected { border-left-color: #e74c3c; }
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .module-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            transition: transform 0.3s;
+            height: 100%;
+        }
+        .module-card:hover {
+            transform: translateY(-5px);
+        }
+        .module-icon {
+            font-size: 40px;
+            margin-bottom: 15px;
+        }
+        .module-card.submit .module-icon { color: #2ecc71; }
+        .module-card.approve .module-icon { color: #f39c12; }
+        .module-card.payment .module-icon { color: #9b59b6; }
+        .recent-table {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-pending-main { background: #e67e22; color: white; }
+        .badge-sub-approved { background: #cce5ff; color: #004085; }
+        .badge-approved { background: #d4edda; color: #155724; }
+        .badge-paid { background: #2ecc71; color: white; }
+        .badge-rejected { background: #f8d7da; color: #721c24; }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        .export-btn {
+            transition: all 0.3s;
+        }
+        
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .division-tabs .nav-link {
+            border-radius: 5px;
+            margin-right: 5px;
+            font-weight: 500;
+        }
+        
+        .division-tabs .nav-link.active {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .category-table th {
+            background-color: #f8f9fa;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .total-row {
+            background-color: #e8f4fd !important;
+            font-weight: bold;
+        }
+        
+        .division-row {
+            background-color: #f8f9fa !important;
+            font-weight: 600;
+        }
+        
+        .amount-cell {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .approval-flow {
+            font-size: 11px;
+            margin-top: 5px;
+        }
+        .approval-flow .step {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 8px;
+            margin-right: 3px;
+            background: #eee;
+            font-size: 10px;
+        }
+        .approval-flow .step.active {
+            background: #f39c12;
+            color: white;
+        }
+        .approval-flow .step.completed {
+            background: #2ecc71;
+            color: white;
+        }
+        
+        .dashboard-alert {
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .sync-status {
+            font-size: 12px;
+        }
+        .sync-online { color: #2ecc71; }
+        .sync-offline { color: #e74c3c; }
+        .sync-syncing { color: #f39c12; }
+    </style>
 </head>
 <body>
     <!-- Navigation -->
@@ -293,44 +208,31 @@ window.addEventListener('error', function(e) {
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-<ul class="navbar-nav ms-auto">
-    <li class="nav-item">
-        <a class="nav-link active" href="Dashboard.html">
-            <i class="bi bi-house-door"></i> Dashboard
-        </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="Form.html">
-            <i class="bi bi-plus-circle"></i> Submit
-        </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="Approval.html">
-            <i class="bi bi-check-circle"></i> Approve
-        </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="Payment.html">
-            <i class="bi bi-credit-card"></i> Pay
-        </a>
-    </li>
-    <!-- TAMBAHKAN INI -->
-    <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
-            <i class="bi bi-person-circle"></i> 
-            <span id="userName">User</span>
-        </a>
-        <ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item" href="#" onclick="showProfile()">
-                <i class="bi bi-person"></i> Profile
-            </a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item text-danger" href="#" onclick="logout()">
-                <i class="bi bi-box-arrow-right"></i> Logout
-            </a></li>
-        </ul>
-    </li>
-</ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="Dashboard.html">
+                            <i class="bi bi-house-door"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="Form.html">
+                            <i class="bi bi-plus-circle"></i> Submit
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="Approval.html">
+                            <i class="bi bi-check-circle"></i> Approve
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="Payment.html">
+                            <i class="bi bi-credit-card"></i> Pay
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
 
     <div class="container">
         <!-- Header -->
@@ -423,7 +325,7 @@ window.addEventListener('error', function(e) {
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="card-title mb-0"><i class="bi bi-pie-chart"></i> Status Distribution</h5>
+                        <h5 class="card-title mb-0"><i class="bi bi-pie-chart"></i> Total per Project</h5>
                     </div>
                     <div class="card-body">
                         <canvas id="statusChart"></canvas>
@@ -473,12 +375,11 @@ window.addEventListener('error', function(e) {
                     </div>
                 </div>
             </div>
-            
-<!-- Quick Actions - VERSI RINGKAS -->
+<!-- Quick Actions - VERSI RINGKAS DENGAN ADMIN PANEL -->
 <div class="col-md-4">
     <div class="card h-100">
         <div class="card-header bg-light">
-            <h5 class="card-title mb-0"><i class="bi bi-lightning-charge"></i> Quick Actions</h5>
+            <h5 class="card-title mb-0"><i class="bi bi-lightning-charge"></i> Admin Quick Actions</h5>
         </div>
         <div class="card-body p-3">
             <div class="d-flex justify-content-around text-center">
@@ -516,7 +417,8 @@ window.addEventListener('error', function(e) {
             </div>
         </div>
     </div>
-</div>
+</div>            
+
 
         <!-- System Overview -->
         <div class="row mb-4">
@@ -635,14 +537,104 @@ window.addEventListener('error', function(e) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 
 <script src="sync-manager.js?v=2.0.0"></script>
- 
+<script>
+// OVERRIDE FUNGSI UNTUK DASHBOARD.HTML
+
+// Simpan fungsi asli
+const originalLoadDashboardData = window.loadDashboardData;
+
+// Override loadDashboardData
+window.loadDashboardData = async function() {
+    try {
+        console.log('Loading consolidated data for dashboard...');
+        
+        if (window.airtableService && window.airtableService.getConsolidatedData) {
+            allExpenses = await window.airtableService.getConsolidatedData();
+            console.log(`Loaded ${allExpenses.length} consolidated expenses`);
+            
+            // Update statistics (salin dari fungsi asli)
+            const totalExpenses = allExpenses.length;
+            const pendingCount = allExpenses.filter(item => item.status === 'pending').length;
+            const pendingMainCount = allExpenses.filter(item => item.status === 'pending-main').length;
+            const subApprovedCount = allExpenses.filter(item => item.status === 'sub-approved').length;
+            const approvedCount = allExpenses.filter(item => item.status === 'approved').length;
+            const paidCount = allExpenses.filter(item => item.paymentStatus === 'paid').length;
+            
+const totalPaid = allExpenses
+    .filter(item => {
+        const fields = item.fields || item;
+        return fields.paymentStatus === 'paid';
+    })
+    .reduce((sum, item) => {
+        const fields = item.fields || item;
+        return sum + parseFloat(fields.amount || 0);
+    }, 0);
+            
+            // Update UI
+            document.getElementById('totalExpenses').textContent = totalExpenses;
+            document.getElementById('pendingCount').textContent = pendingCount;
+            document.getElementById('pendingMainCount').textContent = pendingMainCount;
+            document.getElementById('subApprovedCount').textContent = subApprovedCount;
+            document.getElementById('approvedCount').textContent = approvedCount;
+            document.getElementById('totalPaid').textContent = 'Rp ' + formatCurrency(totalPaid);
+            
+            document.getElementById('submitCount').textContent = totalExpenses;
+            document.getElementById('subApprovalCount').textContent = pendingCount + subApprovedCount;
+            document.getElementById('mainApprovalCount').textContent = pendingMainCount + approvedCount;
+            document.getElementById('paymentCount').textContent = paidCount;
+            
+            updateRecentExpenses(allExpenses);
+            updateSystemStatus(allExpenses);
+            
+            // Update storage status
+            const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
+            document.getElementById('storageStatus').textContent = 
+                `Airtable: ${allExpenses.length} • Local: ${localData.length}`;
+            
+            updateCharts(allExpenses);
+            
+            // Update connection status
+            if (window.SyncManager) {
+                const status = window.SyncManager.getConnectionStatus();
+                const connectionStatus = document.getElementById('connectionStatus');
+                const syncStatus = document.getElementById('syncStatus');
+                
+                if (connectionStatus) {
+                    connectionStatus.innerHTML = status.isOnline ? 
+                        '<span class="badge bg-success">Online (Airtable)</span>' : 
+                        '<span class="badge bg-warning">Offline (Local)</span>';
+                }
+                if (syncStatus) {
+                    syncStatus.textContent = status.isOnline ? 'Synchronized' : 'Offline';
+                    syncStatus.className = status.isOnline ? 'badge bg-success' : 'badge bg-warning';
+                }
+            }
+            
+        } else {
+            if (originalLoadDashboardData) await originalLoadDashboardData();
+        }
+    } catch (error) {
+        console.error('Error loading consolidated data:', error);
+        if (originalLoadDashboardData) await originalLoadDashboardData();
+    }
+};
+
+// Fungsi manual sync
+function manualSync() {
+    if (window.SyncManager) {
+        window.SyncManager.manualSync();
+    } else {
+        alert('Sync Manager not available');
+    }
+}
+</script>
+  
     <script>
         let expenseChart = null;
         let statusChart = null;
         let currentRecentFilter = 'all';
         let chartTimeRange = 'month';
         let allExpenses = [];
-        let divisionChart = null;
 
         // Load data on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -871,7 +863,7 @@ function updateRecentExpenses(submissions) {
                 <small class="text-muted">${division}</small>
             </td>
             <td>${project}</td>
-            <td class="amount-cell"><small>Rp ${formatCurrency(amount)}</small></td>
+            <td class="amount-cell">Rp ${formatCurrency(amount)}</td>
             <td>
                 ${statusBadge}
                 <div class="approval-flow">${approvalFlow}</div>
@@ -940,7 +932,7 @@ function updateRecentExpenses(submissions) {
 
         function updateCharts(expenses) {
             updateExpenseTrendChart(expenses);
-            updateDivisionChart(expenses);
+            updateStatusChart(expenses);
         }
 
         function setChartTimeRange(range) {
@@ -954,8 +946,6 @@ function updateRecentExpenses(submissions) {
             
             updateExpenseTrendChart(allExpenses);
         }
-
-// ========== CHART PIE PER DIVISI (GANTI STATUS CHART) ==========
 
 function updateExpenseTrendChart(expenses) {
     const ctx = document.getElementById('expenseChart').getContext('2d');
@@ -971,6 +961,7 @@ function updateExpenseTrendChart(expenses) {
         // Group data by month (last 6 months)
         const today = new Date();
         
+        // Buat labels untuk 6 bulan terakhir
         for (let i = 5; i >= 0; i--) {
             const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
             const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -982,6 +973,7 @@ function updateExpenseTrendChart(expenses) {
         
         // Hitung total per bulan
         expenses.forEach(expense => {
+            // Akses fields dengan benar (dari struktur Airtable)
             const fields = expense.fields || expense;
             const dateStr = fields.expenseDate || fields.submittedDate || fields.date;
             
@@ -1022,7 +1014,9 @@ function updateExpenseTrendChart(expenses) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'top' },
+                legend: {
+                    position: 'top',
+                },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
@@ -1045,69 +1039,84 @@ function updateExpenseTrendChart(expenses) {
     });
 }
 
-function updateDivisionChart(expenses) {
-    const ctx = document.getElementById('statusChart').getContext('2d'); // Pakai canvas yang sama
+function updateStatusChart(expenses) {
+    const ctx = document.getElementById('statusChart').getContext('2d');
     
-    // Hitung total per divisi
-    const divisionData = {};
+    // Hitung total per project
+    const projectTotals = {};
     
     expenses.forEach(expense => {
         const fields = expense.fields || expense;
-        const division = fields.division || 'Unknown';
-        const amount = parseFloat(fields.amount) || 0;
+        const project = fields.project || 'No Project';
+        const amount = parseFloat(fields.amount || 0);
         
-        if (divisionData[division]) {
-            divisionData[division] += amount;
+        if (projectTotals[project]) {
+            projectTotals[project] += amount;
         } else {
-            divisionData[division] = amount;
+            projectTotals[project] = amount;
         }
     });
     
-    // Siapkan data untuk chart
-    const divisions = Object.keys(divisionData);
-    const amounts = Object.values(divisionData);
+    // Ambil top 5 project terbesar
+    const sortedProjects = Object.entries(projectTotals)
+        .sort((a, b) => b[1] - a[1]);
     
-    // Warna-warna untuk chart
-    const colors = [
-        '#FF6384', '#36A2EB', '#FFCE56', 
-        '#4BC0C0', '#9966FF', '#FF9F40',
-        '#FF6384', '#36A2EB', '#FFCE56'
-    ];
+    let labels = [];
+    let data = [];
+    let otherTotal = 0;
     
-    // Destroy existing chart
-    if (window.divisionChart) {
-        window.divisionChart.destroy();
+    for (let i = 0; i < sortedProjects.length; i++) {
+        if (i < 5) {
+            labels.push(sortedProjects[i][0]);
+            data.push(sortedProjects[i][1]);
+        } else {
+            otherTotal += sortedProjects[i][1];
+        }
     }
     
-    // Buat chart baru
-    window.divisionChart = new Chart(ctx, {
-        type: 'pie',
+    if (otherTotal > 0) {
+        labels.push('Others');
+        data.push(otherTotal);
+    }
+    
+    if (labels.length === 0) {
+        labels = ['No Data'];
+        data = [1];
+    }
+    
+    const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
+    
+    if (statusChart) {
+        statusChart.destroy();
+    }
+    
+    statusChart = new Chart(ctx, {
+        type: 'doughnut',
         data: {
-            labels: divisions,
+            labels: labels,
             datasets: [{
-                data: amounts,
-                backgroundColor: colors.slice(0, divisions.length),
-                borderWidth: 1
+                data: data,
+                backgroundColor: colors,
+                borderColor: '#FFFFFF',
+                borderWidth: 2
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                title: {
-                    display: true,
-                    text: 'Expense Distribution by Division (Rp)'
-                },
-                legend: {
-                    position: 'right',
+                legend: { position: 'right' },
+                title: { 
+                    display: true, 
+                    text: 'Total Expense per Project' 
                 },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
                             const label = context.label || '';
                             const value = context.raw || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            const total = data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
                             return `${label}: Rp ${formatCurrency(value)} (${percentage}%)`;
                         }
                     }
@@ -1116,7 +1125,7 @@ function updateDivisionChart(expenses) {
         }
     });
 }
-    
+
 async function viewExpense(id) {
     try {
         const expense = allExpenses.find(item => item.id === id || item.recordId === id);
@@ -1271,11 +1280,11 @@ async function viewExpense(id) {
         }
 
         function formatCurrency(amount) {
-    return parseFloat(amount || 0).toLocaleString('id-ID', {
-        minimumFractionDigits: 0,  
-        maximumFractionDigits: 0
-    }).replace(/,/g, '.'); 
-}
+            return parseFloat(amount || 0).toLocaleString('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
 
         function formatDate(dateString) {
             if (!dateString) return 'N/A';
@@ -1285,42 +1294,6 @@ async function viewExpense(id) {
                 return dateString;
             }
         }
-
-// Tampilkan nama user di navbar
-function updateUserDisplay() {
-    const user = JSON.parse(sessionStorage.getItem('user'));
-    if (!user) {
-    window.location.href = '/login.html';
-}
-
-// Finance langsung ke Payment
-    if (user.role === 'finance') {
-    window.location.href = '/Payment.html';
-    return;
-}
-    if (user && user.name) {
-        document.getElementById('userName').textContent = user.name.split(' ')[0];
-    }
-}
-
-// Fungsi logout
-function logout() {
-    if (confirm('Yakin ingin logout?')) {
-        sessionStorage.removeItem('user');
-        window.location.href = '/login.html';
-    }
-}
-
-// Fungsi lihat profile
-function showProfile() {
-    const user = JSON.parse(sessionStorage.getItem('user'));
-    alert(`Profile:\n\nNama: ${user.name}\nEmail: ${user.email}\nRole: ${user.role}\nDivision: ${user.division}`);
-}
-
-// Panggil saat halaman dimuat
-document.addEventListener('DOMContentLoaded', function() {
-    updateUserDisplay();
-});
 
 // ========== EXPORT TO EXCEL ==========
 // ========== EXPORT TO EXCEL ==========

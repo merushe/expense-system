@@ -1,249 +1,256 @@
-// api.js - CLIENT-SIDE VERSION (memanggil serverless function)
-const API_BASE_URL = '/api/expenses';
+// api.js - UPDATE DENGAN DOMAIN BARU
+const API_BASE_URL = 'https://expense-system-test8.pages.dev';
 
-window.airtableService = {
+const apiService = {
     // Test koneksi
-    testConnection: async function() {
+    async testConnection() {
         try {
-            console.log('Testing connection...');
-            const response = await fetch(API_BASE_URL);
-            if (response.ok) {
-                console.log('✅ Connection successful');
-                return { success: true };
-            } else {
-                console.error('❌ Connection failed:', response.status);
-                return { success: false, error: `HTTP ${response.status}` };
-            }
+            const response = await fetch(`${API_BASE_URL}/test`);
+            return await response.json();
         } catch (error) {
-            console.error('❌ Connection error:', error);
-            return { success: false, error: error.message };
+            console.error('Connection error:', error);
+            return { success: false };
         }
     },
 
     // Ambil semua expenses
-getAllExpenses: async function() {
-    try {
-        console.log('Fetching from API:', API_BASE_URL);
-        const response = await fetch(API_BASE_URL);
-        
-        console.log('Response status:', response.status);
-        const data = await response.json();
-        console.log('Response data type:', Array.isArray(data) ? 'array' : typeof data);
-        console.log('Response data:', data);
-        
-        if (Array.isArray(data)) {
-            console.log(`✅ Got ${data.length} records`);
-            return data;
-        } else {
-            console.error('❌ Data is not array:', data);
+    async getAllExpenses() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/expenses`);
+            const data = await response.json();
+            
+            // Pastikan data yang dikembalikan adalah array
+            if (Array.isArray(data)) {
+                return data;
+            } else if (data.records) {
+                return data.records;
+            } else {
+                return [];
+            }
+        } catch (error) {
+            console.error('Error fetching expenses:', error);
             return [];
         }
-    } catch (error) {
-        console.error('❌ Error fetching:', error);
-        return [];
-    }
-},
-    
-// Buat expense baru
-    createExpense: async function(expenseData) {
+    },
+
+    // Get expenses by employee email
+    async getMyExpenses(email) {
         try {
-            console.log('Creating expense:', expenseData);
-            
-            const response = await fetch(API_BASE_URL, {
+            const allExpenses = await this.getAllExpenses();
+            return allExpenses.filter(expense => {
+                const fields = expense.fields || expense;
+                return fields.employeeEmail === email;
+            });
+        } catch (error) {
+            console.error('Error getting my expenses:', error);
+            return [];
+        }
+    },
+
+    // Get expenses by manager (untuk manager melihat timnya)
+    async getTeamExpenses(managerEmail) {
+        try {
+            const allExpenses = await this.getAllExpenses();
+            return allExpenses.filter(expense => {
+                const fields = expense.fields || expense;
+                return fields.manager === managerEmail;
+            });
+        } catch (error) {
+            console.error('Error getting team expenses:', error);
+            return [];
+        }
+    },
+
+    // Get pending approvals (untuk manager)
+    async getPendingApprovals(managerEmail) {
+        try {
+            const allExpenses = await this.getAllExpenses();
+            return allExpenses.filter(expense => {
+                const fields = expense.fields || expense;
+                return fields.manager === managerEmail && 
+                       fields.status === 'pending';
+            });
+        } catch (error) {
+            console.error('Error getting pending approvals:', error);
+            return [];
+        }
+    },
+
+    // Get ready for payment (untuk finance)
+    async getReadyForPayment() {
+        try {
+            const allExpenses = await this.getAllExpenses();
+            return allExpenses.filter(expense => {
+                const fields = expense.fields || expense;
+                return fields.status === 'approved' && 
+                       fields.paymentStatus !== 'paid';
+            });
+        } catch (error) {
+            console.error('Error getting ready for payment:', error);
+            return [];
+        }
+    },
+
+    // Buat expense baru
+    async createExpense(expenseData) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/expenses`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(expenseData)
             });
-            
-            if (response.ok) {
-                const result = await response.json();
-                console.log('✅ Create success:', result);
-                return { success: true, recordId: result.recordId };
-            } else {
-                const error = await response.text();
-                console.error('❌ Create failed:', error);
-                return { success: false, error: 'Create failed' };
-            }
+            return await response.json();
         } catch (error) {
-            console.error('❌ Create error:', error);
+            console.error('Error creating expense:', error);
             return { success: false, error: error.message };
         }
     },
 
     // Update expense
-    updateExpense: async function(recordId, updateData) {
+    async updateExpense(id, updateData) {
         try {
-            const response = await fetch(`${API_BASE_URL}/${recordId}`, {
-                method: 'PATCH',
+            const response = await fetch(`${API_BASE_URL}/api/expenses/${id}`, {
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updateData)
             });
-            
-            if (response.ok) {
-                const result = await response.json();
-                console.log('✅ Update success');
-                return { success: true, data: result };
-            } else {
-                console.error('❌ Update failed:', response.status);
-                return { success: false, error: 'Update failed' };
-            }
+            return await response.json();
         } catch (error) {
-            console.error('❌ Update error:', error);
+            console.error('Error updating expense:', error);
             return { success: false, error: error.message };
-        }
-    },
-
-    // Delete expense
-    deleteExpense: async function(recordId) {
-        try {
-            const response = await fetch(`${API_BASE_URL}/${recordId}`, {
-                method: 'DELETE'
-            });
-            
-            if (response.ok) {
-                console.log('✅ Delete success');
-                return { success: true };
-            } else {
-                console.error('❌ Delete failed:', response.status);
-                return { success: false, error: 'Delete failed' };
-            }
-        } catch (error) {
-            console.error('❌ Delete error:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Sinkronisasi dua arah
-    syncTwoWay: async function() {
-        try {
-            console.log('🔄 Starting two-way sync...');
-            
-            const airtableData = await this.getAllExpenses();
-            console.log(`✅ Got ${airtableData.length} from Airtable`);
-            
-            let localData = [];
-            try {
-                localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
-                console.log(`📁 Found ${localData.length} in localStorage`);
-            } catch (e) {
-                console.error('Error reading localStorage:', e);
-            }
-            
-            const airtableIds = new Set(airtableData.map(item => item.airtableId));
-            const mergedData = [...airtableData];
-            
-            for (const localItem of localData) {
-                if (!airtableIds.has(localItem.airtableId) && !localItem.airtableId?.startsWith('local')) {
-                    mergedData.push(localItem);
-                }
-            }
-            
-            localStorage.setItem('expenseSubmissions', JSON.stringify(mergedData));
-            
-            console.log(`✅ Sync complete: ${mergedData.length} total items`);
-            return mergedData;
-        } catch (error) {
-            console.error('❌ Sync failed:', error);
-            return [];
-        }
-    },
-
-    // Sinkronisasi lokal ke Airtable
-    syncLocalToAirtable: async function() {
-        try {
-            const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
-            console.log(`🔄 Syncing ${localData.length} items to Airtable...`);
-            
-            let successCount = 0;
-            let failCount = 0;
-            
-            for (let i = 0; i < localData.length; i++) {
-                const item = localData[i];
-                
-                if (item.airtableId && item.airtableId.startsWith('rec') && item.syncedToAirtable) {
-                    console.log(`⏭️ Item ${item.project} already synced: ${item.airtableId}`);
-                    continue;
-                }
-                
-                console.log(`📤 Uploading item ${i+1}/${localData.length}: ${item.project}`);
-                
-                const cleanItem = {
-                    employeeName: item.employeeName || item.name,
-                    division: item.division,
-                    manager: item.manager,
-                    expenseDate: item.expenseDate || item.date,
-                    expenseType: item.expenseType || item.type || 'reimbursement',
-                    category: item.category || 'other',
-                    project: item.project,
-                    description: item.description || '',
-                    amount: Number(item.amount) || 0,
-                    paymentMethod: item.paymentMethod || 'bank-transfer',
-                    urgency: item.urgency || 'normal',
-                    status: item.status || 'pending',
-                    paymentStatus: item.paymentStatus || 'pending',
-                    hasAttachment: Boolean(item.hasAttachment),
-                    submittedDate: item.submittedDate || new Date().toISOString().split('T')[0]
-                };
-                
-                const result = await this.createExpense(cleanItem);
-                
-                if (result.success) {
-                    localData[i].airtableId = result.recordId;
-                    localData[i].syncedToAirtable = true;
-                    localData[i].lastSync = new Date().toISOString();
-                    successCount++;
-                    console.log(`✅ Uploaded: ${item.project} -> ${result.recordId}`);
-                } else {
-                    failCount++;
-                    console.log(`❌ Failed: ${item.project}`);
-                }
-                
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
-            
-            localStorage.setItem('expenseSubmissions', JSON.stringify(localData));
-            
-            console.log(`📊 Sync complete: ✅ ${successCount} success, ❌ ${failCount} failed`);
-            
-            return { success: true, synced: successCount, failed: failCount };
-        } catch (error) {
-            console.error('❌ Sync error:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Ambil data konsolidasi
-    getConsolidatedData: async function() {
-        try {
-            try {
-                const airtableData = await this.getAllExpenses();
-                if (airtableData.length > 0) {
-                    return airtableData;
-                }
-            } catch (e) {
-                console.warn('⚠️ Failed to get Airtable data:', e.message);
-            }
-            
-            const localData = JSON.parse(localStorage.getItem('expenseSubmissions') || '[]');
-            console.log(`📁 Using ${localData.length} items from localStorage`);
-            
-            return localData.map(item => ({
-                ...item,
-                id: item.airtableId || item.id || `local-${Date.now()}`,
-                source: 'local'
-            }));
-        } catch (error) {
-            console.error('❌ Error getting consolidated data:', error);
-            return [];
         }
     }
 };
 
-// Auto-test koneksi
-setTimeout(() => {
-    if (window.airtableService) {
-        window.airtableService.testConnection().then(result => {
-            console.log('Initial connection test:', result);
+// ========== FUNGSI AUTHENTICATION ==========
+
+// Login user
+async function login(email, password) {
+    try {
+        console.log('Mencoba login dengan email:', email);
+        
+        // Panggil endpoint login
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
         });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Simpan user di session
+            sessionStorage.setItem('user', JSON.stringify(result.user));
+            return { success: true, user: result.user };
+        } else {
+            return { success: false, message: result.error || 'Login gagal' };
+        }
+        
+    } catch (error) {
+        console.error('Login error:', error);
+        return { success: false, message: 'Koneksi error: ' + error.message };
     }
-}, 1000);
+}
+
+// Get user by email
+async function getUserByEmail(email) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/${encodeURIComponent(email)}`);
+        
+        if (!response.ok) {
+            if (response.status === 404) return null;
+            throw new Error(`HTTP error ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        return {
+            id: data.id,
+            email: data.fields.email,
+            name: data.fields.name,
+            role: data.fields.role,
+            division: data.fields.division,
+            manager: data.fields.manager || null
+        };
+        
+    } catch (error) {
+        console.error('Error getting user by email:', error);
+        return null;
+    }
+}
+
+// Get team members for manager
+async function getTeamMembers(managerEmail) {
+    try {
+        // Ambil semua users dulu
+        const response = await fetch(`${API_BASE_URL}/api/users`);
+        const users = await response.json();
+        
+        // Filter yang manager-nya cocok
+        return users
+            .filter(u => u.fields.managerEmail === managerEmail)
+            .map(u => ({
+                email: u.fields.email,
+                name: u.fields.name,
+                division: u.fields.division
+            }));
+            
+    } catch (error) {
+        console.error('Error getting team members:', error);
+        return [];
+    }
+}
+
+// Logout
+function logout() {
+    sessionStorage.removeItem('user');
+    window.location.href = '/login.html';
+}
+
+// Check auth - untuk halaman yang perlu login
+function checkAuth() {
+    const user = sessionStorage.getItem('user');
+    if (!user) {
+        window.location.href = '/login.html';
+        return null;
+    }
+    return JSON.parse(user);
+}
+
+// Check auth - untuk halaman yang bisa diakses tanpa login
+function checkAuthOptional() {
+    const user = sessionStorage.getItem('user');
+    return user ? JSON.parse(user) : null;
+}
+
+// Ganti password
+async function changePassword(email, oldPassword, newPassword) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, oldPassword, newPassword })
+        });
+        
+        return await response.json();
+        
+    } catch (error) {
+        console.error('Error changing password:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// Tambahkan fungsi ke apiService
+apiService.login = login;
+apiService.getUserByEmail = getUserByEmail;
+apiService.getTeamMembers = getTeamMembers;
+apiService.logout = logout;
+apiService.checkAuth = checkAuth;
+apiService.checkAuthOptional = checkAuthOptional;
+apiService.changePassword = changePassword;
+
+// Export
+window.apiService = apiService;
+window.airtableService = apiService;
+
+console.log('✅ apiService dan airtableService tersedia');

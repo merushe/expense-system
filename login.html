@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Expense System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <script src="api.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #2c3e50 0%, #1a2530 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .login-card {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .login-header h2 {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        .login-header p {
+            color: #666;
+            font-size: 14px;
+        }
+        .form-control {
+            height: 45px;
+            border-radius: 8px;
+        }
+        .btn-login {
+            background: linear-gradient(135deg, #2c3e50 0%, #1a2530 100%);
+            border: none;
+            height: 45px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            width: 100%;
+            transition: all 0.3s;
+        }
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .alert {
+            display: none;
+            margin-top: 20px;
+        }
+        .demo-credential {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-header">
+            <i class="bi bi-wallet2" style="font-size: 48px; color: #2c3e50;"></i>
+            <h2 class="mt-2">Expense System</h2>
+            <p>Masukkan email dan password Anda</p>
+        </div>
+        
+        <form id="loginForm">
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" class="form-control" id="email" required 
+                       placeholder="contoh@email.com">
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" required 
+                       placeholder="********">
+            </div>
+            <button type="submit" class="btn-login">
+                <i class="bi bi-box-arrow-in-right"></i> Login
+            </button>
+            <div class="alert alert-danger" id="errorAlert" role="alert"></div>
+        </form>
+        
+        <div class="demo-credential">
+            <small class="text-muted">
+                <i class="bi bi-info-circle"></i> 
+                Gunakan email yang sudah terdaftar di tabel Users
+            </small>
+        </div>
+    </div>
+
+<script>
+    console.log('=== DEBUG LOGIN START ===');
+    console.log('apiService available:', !!window.airtableService);
+    
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const errorAlert = document.getElementById('errorAlert');
+        
+        console.log('=== LOGIN ATTEMPT ===');
+        console.log('Email:', email);
+        console.log('Password length:', password.length);
+        
+        // Tampilkan loading
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading...';
+        submitBtn.disabled = true;
+        
+        try {
+            console.log('Calling apiService.login...');
+            console.log('API_BASE_URL:', window.airtableService.API_BASE_URL);
+            
+            const result = await window.airtableService.login(email, password);
+            
+            console.log('Login result:', result);
+            
+            if (result.success) {
+                console.log('Login SUCCESS! User:', result.user);
+                const user = result.user;
+                
+                // Redirect berdasarkan role
+                if (user.role === 'finance') {
+                    window.location.href = '/Payment.html';
+                } else if (user.role === 'manager' || user.role === 'admin') {
+                    window.location.href = '/Dashboard.html';
+                } else {
+                    window.location.href = '/Dashboard.html';
+                }
+            } else {
+                console.error('Login FAILED:', result);
+                errorAlert.style.display = 'block';
+                errorAlert.textContent = result.message || 'Login gagal';
+            }
+        } catch (error) {
+            console.error('EXCEPTION:', error);
+            errorAlert.style.display = 'block';
+            errorAlert.textContent = 'Terjadi kesalahan: ' + error.message;
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+        
+        // Cek apakah sudah login
+        (function() {
+            const user = sessionStorage.getItem('user');
+            if (user) {
+                window.location.href = '/Dashboard.html';
+            }
+        })();
+    </script>
+</body>
+</html>
